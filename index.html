@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>熙熙的鸽子窝</title>
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/nav.css">
+    <link rel="stylesheet" href="css/layout.css">
+    <link rel="stylesheet" href="css/article.css">
+    <link rel="stylesheet" href="css/page-main.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+
+    <nav>
+        <div class="nav-container">
+            <a href="#" class="nav-logo" data-page="page-main">熙熙的鸽子窝</a>
+            <ul class="nav-links">
+                <li><a href="#" data-page="page-article">文章</a></li>
+                <li><a href="#" data-page="page-categories">分类</a></li>
+                <li><a href="#" data-page="page-about">关于</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div id="app">
+        <section id="page-main" class="page active">
+            <div id="main-canvas"></div>
+        </section>
+
+        <section id="page-article" class="page">
+            <main>
+                <div class="search-input">
+                    <input type="text" id="search-input" placeholder="搜索文章..." style='color: #fff;'>
+                    <button id="search-btn" aria-label="搜索">
+                        <!--使用SVG图标-->
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <circle cx="9" cy="9" r="7" stroke="white" stroke-width="2"/>
+                            <line x1="14.2" y1="14.2" x2="18" y2="18" stroke="white" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                    </button>
+                </div>
+                <div id="article-list"></div>
+            </main>
+        </section>
+
+        <section id="page-article-detail" class="page">
+            <main>
+                <div class="card">
+                    <button class="back-btn" id="back-btn">返回文章列表</button>
+                    <div id="article-detail-tags"></div>
+                    <div id="article-content"></div>
+                </div>
+            </main>
+        </section>
+
+        <section id="page-categories" class="page">
+            <main>
+                <div class="card">
+                    <p>分类列表</p>
+                </div>
+            </main>
+        </section>
+
+        <section id="page-about" class="page">
+            <main>
+                <div class="card">
+                    <p>关于我</p>
+                </div>
+            </main>
+        </section>
+    </div>
+
+    <script src="data/articles_data.js"></script>
+    <script src="js/animations/registry.js"></script>
+    <script src="js/animations/default.js"></script>
+    <script src="js/animations/page-main.js"></script>
+    <script src="js/animations/page-article.js"></script>
+    <script src="js/animations/page-article-detail.js"></script>
+    <script src="js/animations/page-categories.js"></script>
+    <script src="js/animations/page-about.js"></script>
+    <script src="js/home.js"></script>
+    <script src="js/router.js"></script>
+    <script src="js/article.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>

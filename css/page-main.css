@@ -1,0 +1,140 @@
+/**
+ * 主页动画画布与卡片样式
+ */
+
+/* 填满整个页面区域，溢出裁剪（飞入动画中卡片从屏幕外滑入） */
+#main-canvas {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+
+/* 主页卡片：绝对定位于画布内，尺寸和位置由 JS 计算并写入 style */
+.main-card {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    opacity: 0;         /* 由 JS 动画控制 */
+    cursor: default;
+    user-select: none;
+    overflow: hidden;
+    transition: box-shadow 0.2s;
+}
+
+.main-card:hover {
+    cursor: pointer;
+    box-shadow: 0 10px 35px rgba(0, 0, 0, 0.35) !important;
+}
+
+/* 占位标签：未填充内容时显示浅色提示文字 */
+.mc-label {
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.35);
+    font-style: italic;
+    pointer-events: none;
+    position: absolute;
+    bottom: 8px;
+    right: 10px;
+}
+
+/* 内容容器：未来各 widget 的挂载点 */
+.mc-content {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* 最新文章 / 随机推荐卡片：填满内容区，纵向弹性排列，左对齐 */
+.latest-article-card,
+.random-article-card {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    text-align: left;
+    overflow: hidden;
+    padding-bottom: 18px;
+}
+
+/* 随机推荐标题行：标题与刷新按钮横排 */
+.random-card-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    width: 100%;
+    margin-bottom: 4px;
+}
+
+/* 最新文章标题 */
+.latest-article-title {
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.4;
+    margin-bottom: 4px;
+    width: 100%;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+/* 随机推荐标题：flex 撑满剩余宽度，为刷新按钮留位 */
+.random-article-title {
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.4;
+    flex: 1;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+/* 日期：小字，半透明 */
+.latest-article-date,
+.random-article-date {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.6);
+    margin-bottom: 6px;
+    flex-shrink: 0;
+}
+
+/* 摘要：占剩余高度，超出两行截断 */
+.latest-article-excerpt,
+.random-article-excerpt {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.75);
+    line-height: 1.5;
+    flex: 1;
+    width: 100%;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    margin-bottom: 6px;
+}
+
+/* 刷新按钮：无边框，纯白图标，固定尺寸不参与 flex 伸缩 */
+.random-refresh-btn {
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    padding: 2px;
+    cursor: pointer;
+    opacity: 0.55;
+    transition: opacity 0.2s, transform 0.4s ease;
+    line-height: 0;
+}
+
+/* 悬停时完全不透明并旋转一圈 */
+.random-refresh-btn:hover {
+    opacity: 1;
+    transform: rotate(180deg);
+}

@@ -1,0 +1,32 @@
+/**
+ * 基础全局样式：重置、字体、背景与毛玻璃卡片。
+ */
+
+/* 全局重置：清除默认边距与填充，统一使用 border-box 盒模型 */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+/* 页面主体：设置字体、视口高度与固定背景图 */
+body {
+    font-family: "Microsoft YaHei", sans-serif;
+    min-height: 100vh;
+    background-image: url("https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1920&q=80");
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+}
+
+/* 毛玻璃卡片，被导航栏和文章卡片复用 */
+.card {
+    background-color: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 16px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    padding: 24px;
+    color: #fff;
+}
