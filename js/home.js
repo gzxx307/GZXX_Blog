@@ -94,6 +94,7 @@ const MAIN_CARDS_DATA = [
     },
 ];
 
+let randomArticleIndex = Math.floor(Math.random() * ARTICLES_DATA.length);
 
 // 获取最新文章
 function getLatestArticle() {
@@ -102,8 +103,7 @@ function getLatestArticle() {
 // 获取随机文章
 function getRandomArticle() {
     // 从全局 ARTICLES_DATA 中随机选择一篇文章
-    const randomIndex = Math.floor(Math.random() * ARTICLES_DATA.length);
-    return ARTICLES_DATA[randomIndex];
+    return ARTICLES_DATA[randomArticleIndex];
 }
 
 // 加载最新文章到主页卡片
@@ -155,6 +155,13 @@ function loadRandomArticleCard() {
     // 刷新按钮：重新随机一篇，阻止冒泡以避免触发卡片跳转
     content.querySelector('.random-refresh-btn').addEventListener('click', e => {
         e.stopPropagation();
+        // 如果随机到相同文章则切换到下一文章，保证刷新不重复
+        randomArticleNewIndex = Math.floor(Math.random() * ARTICLES_DATA.length);
+        if (randomArticleNewIndex === randomArticleIndex) {
+            randomArticleNewIndex = (randomArticleNewIndex + 1) % ARTICLES_DATA.length;
+        }
+        randomArticleIndex = randomArticleNewIndex;
+
         loadRandomArticleCard();
     });
     // 点击卡片跳转到文章详情
