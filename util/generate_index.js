@@ -19,6 +19,10 @@ const articles = files.map(file => {
     // 使用换行符按行分割文件，得到字符串数组
     const lines = content.split('\n');
 
+    // 移除正文中的'Tags:'行
+    const filteredLines = lines.filter(line => !line.startsWith('Tags: '));
+    const filteredContent = filteredLines.join('\n');
+
     // 提取标题（第一个 # 开头的行）
     const titleLine = lines.find(l => l.startsWith('# '));
     // 如果没有标题行，则使用文件名（去掉 .md）作为标题
@@ -53,8 +57,8 @@ const articles = files.map(file => {
     // 将修改时间转换为 ISO 格式的字符串，并取前10个字符（即年月日部分）
     const date = stat.mtime.toISOString().slice(0, 10);
 
-    // 返回所有数据
-    return { file, title, tags, excerpt, date, content };
+    // 返回所有数据，正文内容已移除'Tags:'行
+    return { file, title, tags, excerpt, date, content: filteredContent };
 });
 
 // 按修改时间降序排序（最新的文章排在前面）
