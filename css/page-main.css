@@ -238,3 +238,145 @@
 .calendar-day.empty {
     visibility: hidden;
 }
+
+/* 音乐播放器：左封面右信息，水平排列，撑满内容区 */
+.music-player {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+/* 封面容器：固定不收缩 */
+.music-cover-wrap {
+    flex-shrink: 0;
+}
+
+/* 圆形封面：默认渐变背景 + 居中音符图标，有封面图时作为背景 */
+.music-cover {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.06));
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+    background-size: cover;
+    background-position: center;
+}
+
+/* 播放中：封面持续旋转 */
+.music-cover.playing {
+    animation: music-spin 8s linear infinite;
+}
+
+@keyframes music-spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+}
+
+/* 右侧信息列：撑满剩余宽度，纵向排列 */
+.music-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+/* 歌曲标题：超出单行截断 */
+.music-title {
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* 艺术家：半透明小字，截断 */
+.music-artist {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.6);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* 进度条区域：轨道 + 时间行纵向排列 */
+.music-progress-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+/* 进度条轨道 */
+.music-bar {
+    width: 100%;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 2px;
+    cursor: pointer;
+}
+
+/* 已播放填充 */
+.music-bar-fill {
+    height: 100%;
+    width: 0%;
+    background: rgba(255, 255, 255, 0.85);
+    border-radius: 2px;
+    transition: width 0.3s linear;
+}
+
+/* 时间行：当前时间左对齐，总时长右对齐 */
+.music-time {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+/* 控制按钮行：居中排列 */
+.music-controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+}
+
+/* 控制按钮基础样式：无背景，半透明，悬停放大 */
+.music-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    opacity: 0.7;
+    transition: opacity 0.2s, transform 0.15s;
+    line-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.music-btn:hover {
+    opacity: 1;
+    transform: scale(1.1);
+}
+
+/* 播放/暂停按钮：圆形毛玻璃底 */
+.music-play-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    opacity: 1;
+}
+
+.music-play-btn:hover {
+    background: rgba(255, 255, 255, 0.25);
+    transform: scale(1.08);
+}

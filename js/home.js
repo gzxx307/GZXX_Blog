@@ -244,10 +244,178 @@ function loadCalendarCard() {
     `;
 }
 
+// 加载音乐播放器卡片
+function loadMusicCard() {
+    const card = document.getElementById('mc-music');
+    if (!card) return;
+    const content = card.querySelector('.mc-content');
+    if (!content) return;
+
+    let currentIndex = 0;
+    let isPlaying = false;
+    const audio = new Audio();
+
+    // 播放器骨架 HTML
+    content.innerHTML = `
+        <div class="music-player">
+            <div class="music-cover-wrap">
+                <div class="music-cover" id="mc-cover-img">
+                    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M9 18V5l12-2v13" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                        <circle cx="6" cy="18" r="3" stroke="white" stroke-width="1.5"/>
+                        <circle cx="18" cy="16" r="3" stroke="white" stroke-width="1.5"/>
+                    </svg>
+                </div>
+            </div>
+            <div class="music-info">
+                <div class="music-title" id="mc-title"></div>
+                <div class="music-artist" id="mc-artist"></div>
+                <div class="music-progress-wrap">
+                    <div class="music-bar" id="mc-bar">
+                        <div class="music-bar-fill" id="mc-fill"></div>
+                    </div>
+                    <div class="music-time">
+                        <span id="mc-cur">0:00</span>
+                        <span id="mc-total">0:00</span>
+                    </div>
+                </div>
+                <div class="music-controls">
+                    <button class="music-btn" id="mc-prev" aria-label="上一首">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="white">
+                            <path d="M19 20L9 12l10-8v16z"/>
+                            <rect x="5" y="4" width="2.5" height="16" rx="1"/>
+                        </svg>
+                    </button>
+                    <button class="music-btn music-play-btn" id="mc-play" aria-label="播放">
+                        <svg id="mc-play-icon" width="20" height="20" viewBox="0 0 24 24" fill="white">
+                            <path d="M8 5v14l11-7z"/>
+                        </svg>
+                    </button>
+                    <button class="music-btn" id="mc-next" aria-label="下一首">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="white">
+                            <path d="M5 4l10 8-10 8V4z"/>
+                            <rect x="16.5" y="4" width="2.5" height="16" rx="1"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // 获取到各个元素的引用
+    const coverEl = content.querySelector('#mc-cover-img');
+    const titleEl = content.querySelector('#mc-title');
+    const artistEl = content.querySelector('#mc-artist');
+    const barEl = content.querySelector('#mc-bar');
+    const fillEl = content.querySelector('#mc-fill');
+    const curEl = content.querySelector('#mc-cur');
+    const totalEl = content.querySelector('#mc-total');
+    const playIconEl = content.querySelector('#mc-play-icon');
+
+    // 秒数格式化为 m:ss
+    function fmtTime(sec) {
+        if (!isFinite(sec) || sec < 0) return '0:00';
+        const m = Math.floor(sec / 60);
+        const s = String(Math.floor(sec % 60)).padStart(2, '0');
+        return `${m}:${s}`;
+    }
+
+    // 将指定索引的曲目信息渲染到界面
+    function loadTrack(index) {
+        const track = PLAYLIST[index];
+        titleEl.textContent = track.title;
+        artistEl.textContent = track.artist;
+        audio.src = track.src;
+        // 有封面图则作为背景，隐藏默认音符 SVG
+        const iconSvg = coverEl.querySelector('svg');
+        if (track.cover) {
+            coverEl.style.backgroundImage = `url(${track.cover})`;
+            iconSvg.style.display = 'none';
+        } else {
+            coverEl.style.backgroundImage = '';
+            iconSvg.style.display = '';
+        }
+        fillEl.style.width = '0%';
+        curEl.textContent = '0:00';
+        totalEl.textContent = '0:00';
+    }
+
+    // 切换播放状态，同步图标和封面旋转动画
+    function setPlaying(playing) {
+        isPlaying = playing;
+        if (playing) {
+            audio.play().catch(() => {});
+            coverEl.classList.add('playing');
+            // 暂停图标：两个竖条
+            playIconEl.setAttribute('viewBox', '0 0 24 24');
+            playIconEl.innerHTML = '<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>';
+        } else {
+            audio.pause();
+            coverEl.classList.remove('playing');
+            // 播放图标：三角形
+            playIconEl.setAttribute('viewBox', '0 0 24 24');
+            playIconEl.innerHTML = '<path d="M8 5v14l11-7z"/>';
+        }
+    }
+
+    // 播放/暂停切换
+    content.querySelector('#mc-play').addEventListener('click', e => {
+        e.stopPropagation();
+        setPlaying(!isPlaying);
+    });
+
+    // 上一首
+    content.querySelector('#mc-prev').addEventListener('click', e => {
+        e.stopPropagation();
+        currentIndex = (currentIndex - 1 + PLAYLIST.length) % PLAYLIST.length;
+        loadTrack(currentIndex);
+        if (isPlaying) setPlaying(true);
+    });
+
+    // 下一首
+    content.querySelector('#mc-next').addEventListener('click', e => {
+        e.stopPropagation();
+        currentIndex = (currentIndex + 1) % PLAYLIST.length;
+        loadTrack(currentIndex);
+        if (isPlaying) setPlaying(true);
+    });
+
+    // 点击进度条跳转到对应位置
+    barEl.addEventListener('click', e => {
+        e.stopPropagation();
+        if (!audio.duration) return;
+        const rect = barEl.getBoundingClientRect();
+        const ratio = (e.clientX - rect.left) / rect.width;
+        audio.currentTime = Math.max(0, Math.min(1, ratio)) * audio.duration;
+    });
+
+    // 播放进度更新：同步进度条与当前时间
+    audio.addEventListener('timeupdate', () => {
+        if (!audio.duration) return;
+        fillEl.style.width = (audio.currentTime / audio.duration * 100) + '%';
+        curEl.textContent = fmtTime(audio.currentTime);
+    });
+
+    // 元数据加载完成后更新总时长
+    audio.addEventListener('loadedmetadata', () => {
+        totalEl.textContent = fmtTime(audio.duration);
+    });
+
+    // 播放结束后自动切换下一首
+    audio.addEventListener('ended', () => {
+        currentIndex = (currentIndex + 1) % PLAYLIST.length;
+        loadTrack(currentIndex);
+        setPlaying(true);
+    });
+
+    loadTrack(currentIndex);
+}
+
 // 加载所有卡片元素
 function loadAllCards(){
     loadLatestArticleCard();
     loadRandomArticleCard();
     loadTimeCard();
     loadCalendarCard();
+    loadMusicCard();
 }
