@@ -138,3 +138,103 @@
     opacity: 1;
     transform: rotate(180deg);
 }
+
+/* 时间卡片：纵向居中排列各元素 */
+.time-card {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 2px;
+}
+
+/* 时:分 主显示，加粗大字 */
+.time-main {
+    font-size: 32px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    line-height: 1;
+}
+
+/* 秒数，半透明小字 */
+.time-seconds {
+    font-size: 16px;
+    font-weight: 400;
+    letter-spacing: 2px;
+    color: rgba(255, 255, 255, 0.6);
+    line-height: 1;
+}
+
+/* 星期，更小更淡 */
+.time-weekday {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.45);
+    margin-top: 4px;
+    line-height: 1;
+}
+
+/* 日历卡片：纵向填满内容区 */
+.calendar-card {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+/* 年月标题，居中加粗 */
+.calendar-header {
+    font-size: 14px;
+    font-weight: 600;
+    text-align: center;
+    margin-bottom: 2px;
+    flex-shrink: 0;
+}
+
+/* 星期标题行：7 列均分 */
+.calendar-weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    text-align: center;
+    flex-shrink: 0;
+}
+
+/* 单个星期标签，半透明小字 */
+.calendar-weekday {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.5);
+    padding: 2px 0;
+}
+
+/* 日期网格：7 列，撑满剩余高度 */
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+    flex: 1;
+    align-content: start;
+}
+
+/* 日期格，居中对齐，圆角方块 */
+.calendar-day {
+    font-size: 12px;
+    text-align: center;
+    padding: 4px 2px;
+    border-radius: 6px;
+    line-height: 1.4;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+/* 今日高亮：半透明白底 + 完全不透明白字 */
+.calendar-day.today {
+    background: rgba(255, 255, 255, 0.25);
+    color: #fff;
+    font-weight: 700;
+}
+
+/* 月首空占位格：隐藏但保留位置 */
+.calendar-day.empty {
+    visibility: hidden;
+}

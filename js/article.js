@@ -104,8 +104,8 @@ function searchArticles(keyword) {
             const container = document.getElementById('article-list');
             container.innerHTML = '';
             loadArticleList();
-            // 解除动画锁
-            isArticleAnimating = false;
         }
     );
+    // 解除动画锁
+    isArticleAnimating = false;
 }

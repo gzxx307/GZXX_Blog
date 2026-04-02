@@ -166,27 +166,82 @@ function loadTimeCard() {
     if (!card) return;
     const content = card.querySelector('.mc-content');
     if (!content) return;
-    let time;
-    function updateTime() {
-        console.log('Time Updated: ' + new Date().toLocaleTimeString());
-        const now = new Date();
-        const timeString = now.toLocaleTimeString();
-        time = timeString;
 
-        content.textContent = time;
+    // 星期中文名称
+    const WEEKDAY_NAMES = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
+
+    // 插入时间卡片结构
+    content.innerHTML = `
+        <div class="time-card">
+            <div class="time-main"></div>
+            <div class="time-seconds"></div>
+            <div class="time-weekday"></div>
+        </div>
+    `;
+
+    const mainEl = content.querySelector('.time-main');
+    const secEl = content.querySelector('.time-seconds');
+    const weekEl = content.querySelector('.time-weekday');
+
+    function updateTime() {
+        const now = new Date();
+        // 格式化时、分、秒，不足两位补零
+        const h = String(now.getHours()).padStart(2, '0');
+        const m = String(now.getMinutes()).padStart(2, '0');
+        const s = String(now.getSeconds()).padStart(2, '0');
+        mainEl.textContent = `${h}:${m}`;
+        secEl.textContent = s;
+        weekEl.textContent = WEEKDAY_NAMES[now.getDay()];
     }
     updateTime();
     setInterval(updateTime, 1000);
 }
 
+// 加载日历卡片
 function loadCalendarCard() {
     const card = document.getElementById('mc-calendar');
     if (!card) return;
     const content = card.querySelector('.mc-content');
     if (!content) return;
+
     const now = new Date();
-    const dateString = now.toLocaleDateString();
-    content.textContent = dateString;
+    const year = now.getFullYear();
+    // getMonth() 返回 0-11
+    const month = now.getMonth();
+    const today = now.getDate();
+
+    // 该月第一天是星期几（0=日）
+    const firstWeekday = new Date(year, month, 1).getDay();
+    // 该月天数
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+    const MONTH_NAMES = ['一月', '二月', '三月', '四月', '五月', '六月',
+                         '七月', '八月', '九月', '十月', '十一月', '十二月'];
+    const WEEKDAY_LABELS = ['日', '一', '二', '三', '四', '五', '六'];
+
+    // 构建星期标题行
+    const weekdaysHtml = WEEKDAY_LABELS
+        .map(w => `<span class="calendar-weekday">${w}</span>`)
+        .join('');
+
+    // 构建日期格子，月初前补空占位
+    let cellsHtml = '';
+    for (let i = 0; i < firstWeekday; i++) {
+        cellsHtml += '<span class="calendar-day empty"></span>';
+    }
+    for (let d = 1; d <= daysInMonth; d++) {
+        // 今天加 today 类
+        const cls = d === today ? 'calendar-day today' : 'calendar-day';
+        cellsHtml += `<span class="${cls}">${d}</span>`;
+    }
+
+    content.innerHTML = `
+        <div class="calendar-card">
+            <div class="calendar-header">${year}年 ${MONTH_NAMES[month]}</div>
+            <div class="calendar-weekdays">${weekdaysHtml}</div>
+            <div class="calendar-grid">${cellsHtml}</div>
+        </div>
+    `;
 }
 
 // 加载所有卡片元素
