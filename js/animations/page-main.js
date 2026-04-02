@@ -112,9 +112,9 @@ function buildAndEnterCards(canvas) {
     // 获取画布实际高度
     const ch = canvas.clientHeight;
 
-    // 根据卡片数据创建 DOM 元素，并计算各自的飞入起点与终点坐标
-    const cards = MAIN_CARDS_DATA.map(data => {
-        // 计算该卡片在实际画布中的坐标和尺寸
+    // 根据 order 属性排序后再创建 DOM 元素
+    const sortedData = MAIN_CARDS_DATA.slice().sort((a, b) => (a.order || 0) - (b.order || 0));
+    const cards = sortedData.map(data => {
         const { startX, startY, endX, endY, w, h } = computePositions(data, cw, ch);
 
         // 创建卡片元素
@@ -174,9 +174,9 @@ function exitCards(canvas) {
                 const curX = parseFloat(el.style.left);
                 const curY = parseFloat(el.style.top);
 
-                // 反向对应原始数据，复用 computePositions 得到飞出目标（同飞入起点）
-                const dataIndex = MAIN_CARDS_DATA.length - 1 - i;
-                const { startX, startY } = computePositions(MAIN_CARDS_DATA[dataIndex], cw, ch);
+                // 通过 id 找到对应数据，复用 computePositions 得到飞出目标（同飞入起点）
+                const data = MAIN_CARDS_DATA.find(d => d.id === el.id);
+                const { startX, startY } = computePositions(data, cw, ch);
 
                 runAnimation(EXIT_DURATION, easeInExpo, et => {
                     el.style.left = lerp(curX, startX, et) + 'px';

@@ -7,31 +7,36 @@ const MAIN_CARDS_DATA = [
     {
         id: 'mc-welcome',
         html: '<div class="mc-content"></div><span class="mc-label">欢迎</span>',
-        rx: 16,   ry: 16,  rw: 300, rh: 260
+        rx: 16,   ry: 16,  rw: 300, rh: 260,
+        order: 3
     },
     // 时间
     {
         id: 'mc-time',
         html: '<div class="mc-content"></div><span class="mc-label">时间</span>',
-        rx: 326,  ry: 16,  rw: 200, rh: 125
+        rx: 326,  ry: 16,  rw: 200, rh: 125,
+        order: 2
     },
     // 天气
     {
         id: 'mc-weather',
         html: '<div class="mc-content"></div><span class="mc-label">天气</span>',
-        rx: 326,  ry: 151, rw: 200, rh: 125
+        rx: 326,  ry: 151, rw: 200, rh: 125,
+        order: 1
     },
     // 日历
     {
         id: 'mc-calendar',
         html: '<div class="mc-content"></div><span class="mc-label">日历</span>',
-        rx: 536,  ry: 16,  rw: 280, rh: 260
+        rx: 536,  ry: 16,  rw: 280, rh: 260,
+        order: 4
     },
     // 音乐播放器（网易云）
     {
         id: 'mc-music',
         html: '<div class="mc-content"></div><span class="mc-label">音乐播放器</span>',
-        rx: 826,  ry: 16,  rw: 358, rh: 260
+        rx: 826,  ry: 16,  rw: 358, rh: 260,
+        order: 5
     },
 
     // Row 2
@@ -39,40 +44,47 @@ const MAIN_CARDS_DATA = [
     {
         id: 'mc-about',
         html: '<div class="mc-content"></div><span class="mc-label">关于</span>',
-        rx: 16,   ry: 286, rw: 150, rh: 188
+        rx: 16,   ry: 286, rw: 150, rh: 188,
+        order: 8
     },
     // 最新文章
     {
         id: 'mc-articles',
         html: '<div class="mc-content"></div><span class="mc-label">最新文章</span>',
-        rx: 176,  ry: 286, rw: 360, rh: 188
+        rx: 176,  ry: 286, rw: 360, rh: 188,
+        order: 6
     },
     // 随机推荐文章
     {
         id: 'mc-recommend',
         html: '<div class="mc-content"></div><span class="mc-label">随机推荐</span>',
-        rx: 546,  ry: 286, rw: 260, rh: 188
+        rx: 546,  ry: 286, rw: 260, rh: 188,
+        order: 7
     },
     // 平台链接 2×2（B站、GitHub、网易云、邮箱）
     {
         id: 'mc-bilibili',
         html: '<div class="mc-content"></div><span class="mc-label">Bilibili</span>',
-        rx: 816,  ry: 286, rw: 179, rh: 89
+        rx: 816,  ry: 286, rw: 179, rh: 89,
+        order: 9
     },
     {
         id: 'mc-github',
         html: '<div class="mc-content"></div><span class="mc-label">GitHub</span>',
-        rx: 1005, ry: 286, rw: 179, rh: 89
+        rx: 1005, ry: 286, rw: 179, rh: 89,
+        order: 11
     },
     {
         id: 'mc-netease',
         html: '<div class="mc-content"></div><span class="mc-label">网易云音乐</span>',
-        rx: 816,  ry: 385, rw: 179, rh: 89
+        rx: 816,  ry: 385, rw: 179, rh: 89,
+        order: 10
     },
     {
         id: 'mc-email',
         html: '<div class="mc-content"></div><span class="mc-label">邮箱</span>',
-        rx: 1005, ry: 385, rw: 179, rh: 89
+        rx: 1005, ry: 385, rw: 179, rh: 89,
+        order: 12
     },
 
     // Row 3
@@ -80,17 +92,20 @@ const MAIN_CARDS_DATA = [
     {
         id: 'mc-extra-a',
         html: '<div class="mc-content"></div><span class="mc-label"></span>',
-        rx: 16,   ry: 484, rw: 380, rh: 200
+        rx: 16,   ry: 484, rw: 380, rh: 200,
+        order: 13
     },
     {
         id: 'mc-extra-b',
         html: '<div class="mc-content"></div><span class="mc-label"></span>',
-        rx: 406,  ry: 484, rw: 520, rh: 200
+        rx: 406,  ry: 484, rw: 520, rh: 200,
+        order: 14
     },
     {
         id: 'mc-extra-c',
         html: '<div class="mc-content"></div><span class="mc-label"></span>',
-        rx: 936,  ry: 484, rw: 248, rh: 200
+        rx: 936,  ry: 484, rw: 248, rh: 200,
+        order: 15
     },
 ];
 
