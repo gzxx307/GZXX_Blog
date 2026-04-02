@@ -2,6 +2,8 @@
  * 文章列表页与文章详情页样式。
  */
 
+/* 文章列表卡片 */
+
 /* 文章卡片：可点击，悬停时上移并加深阴影 */
 .article-card {
     cursor: pointer;
@@ -55,6 +57,8 @@
     border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
+/* 搜索框 */
+
 /* 搜索框容器：相对定位，供按钮绝对定位使用 */
 .search-input {
     position: relative;
@@ -103,7 +107,6 @@
     justify-content: center;
     transition: background 0.2s, opacity 0.2s;
 }
-
 #search-btn svg {
     display: block;
     width: 20px;
@@ -188,4 +191,40 @@
     display: block;
     margin: 1em auto;
     box-sizing: border-box;
+}
+
+/* 文章内链接：半透明白色，悬停时加下划线 */
+#article-content a {
+    color: rgba(255, 255, 255, 0.8);
+    text-decoration: none;
+    transition: text-decoration 0.2s;
+}
+#article-content a:hover {
+    text-decoration: underline;
+}
+
+/* 文章内引用块：左侧有色边框，内边距 */
+#article-content blockquote {
+    border-left: 3px solid rgba(255, 255, 255, 0.4);
+    padding-left: 1em;
+    margin: 1em 0;
+}
+
+/* 文章内表格：半透明背景与边框 */
+#article-content table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 1em;
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+#article-content th, #article-content td {
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 8px;
+    text-align: left;
+}
+#article-content th { 
+    background: rgba(255, 255, 255, 0.25);
+    font-weight: bold;
+    text-align: left;
 }
