@@ -418,6 +418,43 @@ function loadMusicCard() {
     loadTrack(currentIndex);
 }
 
+function loadLinkCards(){
+    // 创建链接卡片内容
+    const emailCard = document.getElementById('mc-email');
+    if (!emailCard) return;
+    const emailContent = emailCard.querySelector('.mc-content');
+    if (!emailContent) return;
+    emailContent.innerHTML = `
+        <div class="link-card">
+            <p>QQ：3581544162@qq.com</p>
+            <p>Gmail：gzxx307@gmail.com</p>
+        </div>
+    `;
+
+    registerLinkCards();
+}
+
+function registerLinkCards(){
+    const bilibiliCard = document.getElementById('mc-bilibili');
+    if (bilibiliCard) {
+        bilibiliCard.addEventListener('click', () => {
+            window.open('https://space.bilibili.com/372575779', '_blank');
+        });
+    }
+    const githubCard = document.getElementById('mc-github');
+    if (githubCard) {
+        githubCard.addEventListener('click', () => {
+            window.open('https://github.com/gzxx307', '_blank');
+        });
+    }
+    const neteaseCard = document.getElementById('mc-netease');
+    if (neteaseCard) {
+        neteaseCard.addEventListener('click', () => {
+            window.open('https://music.163.com/#/artist?id=35879730', '_blank');
+        });
+    }
+}
+
 // 加载所有卡片元素
 function loadAllCards(){
     loadLatestArticleCard();
@@ -425,4 +462,5 @@ function loadAllCards(){
     loadTimeCard();
     loadCalendarCard();
     loadMusicCard();
+    loadLinkCards();
 }
