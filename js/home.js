@@ -432,7 +432,7 @@ function loadMusicCard() {
 
     loadTrack(currentIndex);
 }
-
+// 加载平台链接卡片内容并注册点击事件
 function loadLinkCards(){
     // 创建链接卡片内容
     const emailCard = document.getElementById('mc-email');
@@ -448,7 +448,7 @@ function loadLinkCards(){
 
     registerLinkCards();
 }
-
+// 注册平台链接卡片的点击事件
 function registerLinkCards(){
     const bilibiliCard = document.getElementById('mc-bilibili');
     if (bilibiliCard) {
@@ -470,6 +470,32 @@ function registerLinkCards(){
     }
 }
 
+// 加载关于卡片
+function loadAboutCard() {
+    const card = document.getElementById('mc-about');
+    if (!card) return;
+    const content = card.querySelector('.mc-content');
+    if (!content) return;
+    content.innerHTML = `
+        <div class="about-card">
+            <h1>关于我</h1>
+            <p>你想知道的一切</p>
+        </div>
+    `;
+
+    card.addEventListener('click', () => {
+        navigateTo('page-about');
+    });
+}
+
+// 加载欢迎卡片
+function loadWelcomeCard() {
+    const card = document.getElementById('mc-welcome');
+    if (!card) return;
+    const content = card.querySelector('.mc-content');
+    if (!content) return;
+}
+
 // 加载所有卡片元素
 function loadAllCards(){
     loadLatestArticleCard();
@@ -478,4 +504,5 @@ function loadAllCards(){
     loadCalendarCard();
     loadMusicCard();
     loadLinkCards();
+    loadAboutCard();
 }
