@@ -109,16 +109,18 @@ const MAIN_CARDS_DATA = [
     },
 ];
 
-let randomArticleIndex = Math.floor(Math.random() * ARTICLES_DATA.length);
+// 排除 about_me.md，仅保留正式博客文章
+const BLOG_ARTICLES = ARTICLES_DATA.filter(a => a.file !== 'about_me.md');
+
+let randomArticleIndex = Math.floor(Math.random() * BLOG_ARTICLES.length);
 
 // 获取最新文章
 function getLatestArticle() {
-    return ARTICLES_DATA[0];
+    return BLOG_ARTICLES[0];
 }
 // 获取随机文章
 function getRandomArticle() {
-    // 从全局 ARTICLES_DATA 中随机选择一篇文章
-    return ARTICLES_DATA[randomArticleIndex];
+    return BLOG_ARTICLES[randomArticleIndex];
 }
 
 // 加载最新文章到主页卡片
@@ -171,9 +173,9 @@ function loadRandomArticleCard() {
     content.querySelector('.random-refresh-btn').addEventListener('click', e => {
         e.stopPropagation();
         // 如果随机到相同文章则切换到下一文章，保证刷新不重复
-        randomArticleNewIndex = Math.floor(Math.random() * ARTICLES_DATA.length);
+        randomArticleNewIndex = Math.floor(Math.random() * BLOG_ARTICLES.length);
         if (randomArticleNewIndex === randomArticleIndex) {
-            randomArticleNewIndex = (randomArticleNewIndex + 1) % ARTICLES_DATA.length;
+            randomArticleNewIndex = (randomArticleNewIndex + 1) % BLOG_ARTICLES.length;
         }
         randomArticleIndex = randomArticleNewIndex;
 
@@ -494,10 +496,31 @@ function loadWelcomeCard() {
     if (!card) return;
     const content = card.querySelector('.mc-content');
     if (!content) return;
+
+    // 有头像路径则使用 img，否则显示姓名首字作为占位
+    const avatarHtml = PROFILE.avatar
+        ? `<img class="welcome-avatar" src="${PROFILE.avatar}" alt="${PROFILE.name}">`
+        : `<div class="welcome-avatar welcome-avatar-placeholder">${PROFILE.name.charAt(0)}</div>`;
+
+    // 将标签数组转为标签 HTML
+    const badgesHtml = PROFILE.badges.map(b => `<span class="welcome-badge">${b}</span>`).join('');
+
+    content.innerHTML = `
+        <div class="welcome-card">
+            ${avatarHtml}
+            <div class="welcome-info">
+                <div class="welcome-name">${PROFILE.name}</div>
+                <div class="welcome-tagline">${PROFILE.tagline}</div>
+                <p class="welcome-bio">${PROFILE.bio}</p>
+                <div class="welcome-badges">${badgesHtml}</div>
+            </div>
+        </div>
+    `;
 }
 
 // 加载所有卡片元素
 function loadAllCards(){
+    loadWelcomeCard();
     loadLatestArticleCard();
     loadRandomArticleCard();
     loadTimeCard();
