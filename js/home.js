@@ -490,6 +490,72 @@ function loadAboutCard() {
     });
 }
 
+// 加载天气卡片：通过浏览器定位获取坐标，调用 Open-Meteo 免费接口
+function loadWeatherCard() {
+    const card = document.getElementById('mc-weather');
+    if (!card) return;
+    const content = card.querySelector('.mc-content');
+    if (!content) return;
+
+    // 用坐标请求 Open-Meteo 并渲染天气卡片内容
+    function fetchAndRender(lat, lon) {
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code,wind_speed_10m,relative_humidity_2m&timezone=auto&wind_speed_unit=kmh`;
+        fetch(url)
+            .then(r => r.json())
+            .then(data => {
+                const cur = data.current;
+                // 温度取整
+                const temp = Math.round(cur.temperature_2m);
+                const humidity = cur.relative_humidity_2m;
+                const wind = Math.round(cur.wind_speed_10m);
+                // 根据 WMO 天气码获取图标和描述
+                const { key, text } = getWeatherInfo(cur.weather_code);
+                const svgContent = WEATHER_ICONS[key];
+                content.innerHTML = `
+                    <div class="weather-card">
+                        <div class="weather-main">
+                            <svg class="weather-svg" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">${svgContent}</svg>
+                            <span class="weather-temp">${temp}°C</span>
+                        </div>
+                        <div class="weather-desc">${text}</div>
+                        <div class="weather-extra">
+                            <span>湿度 ${humidity}%</span>
+                            <span>风 ${wind} km/h</span>
+                        </div>
+                    </div>
+                `;
+            })
+            .catch(() => {
+                content.innerHTML = '<div class="weather-card"><div class="weather-hint">天气获取失败</div></div>';
+            });
+    }
+
+    // 定位失败时回退到 profile.js 中配置的坐标
+    function fallbackToConfig() {
+        const loc = PROFILE.location;
+        fetchAndRender(loc.latitude.toFixed(4), loc.longitude.toFixed(4));
+    }
+
+    content.innerHTML = '<div class="weather-card"><div class="weather-hint">获取天气中...</div></div>';
+
+    // 浏览器不支持定位则直接使用配置坐标
+    if (!navigator.geolocation) {
+        fallbackToConfig();
+        return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+        pos => {
+            const lat = pos.coords.latitude.toFixed(4);
+            const lon = pos.coords.longitude.toFixed(4);
+            fetchAndRender(lat, lon);
+        },
+        // 定位被拒绝或超时，回退到配置坐标
+        fallbackToConfig,
+        { timeout: 5000 }
+    );
+}
+
 // 加载欢迎卡片
 function loadWelcomeCard() {
     const card = document.getElementById('mc-welcome');
@@ -520,6 +586,7 @@ function loadWelcomeCard() {
 
 // 加载所有卡片元素
 function loadAllCards(){
+    loadWeatherCard();
     loadWelcomeCard();
     loadLatestArticleCard();
     loadRandomArticleCard();

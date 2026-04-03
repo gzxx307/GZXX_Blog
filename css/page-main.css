@@ -139,6 +139,72 @@
     white-space: nowrap;
 }
 
+/* 天气卡片 */
+
+/* 天气卡片 */
+.weather-card {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 5px;
+}
+
+/* 第一行 */
+.weather-main {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* SVG 图标尺寸 */
+.weather-svg {
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+}
+
+/* 温度大字 */
+.weather-temp {
+    font-size: 26px;
+    font-weight: 700;
+    color: #fff;
+    line-height: 1;
+}
+
+/* 天气描述文字 */
+.weather-desc {
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.85);
+    line-height: 1;
+    text-align: left;
+}
+
+/* 湿度与风速 */
+.weather-extra {
+    display: flex;
+    gap: 10px;
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.6);
+    line-height: 1;
+}
+
+/* 链接卡片图标图片 */
+.link-icon {
+    width: 40px;
+    height: 40px;
+    object-fit: contain;
+}
+
+/* 加载中 / 错误提示 */
+.weather-hint {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.55);
+    text-align: center;
+    width: 100%;
+}
+
 /* 最新文章 / 随机推荐卡片：填满内容区，纵向弹性排列，左对齐 */
 .latest-article-card,
 .random-article-card {
