@@ -436,17 +436,52 @@ function loadMusicCard() {
 }
 // 加载平台链接卡片内容并注册点击事件
 function loadLinkCards(){
-    // 创建链接卡片内容
-    const emailCard = document.getElementById('mc-email');
-    if (!emailCard) return;
-    const emailContent = emailCard.querySelector('.mc-content');
-    if (!emailContent) return;
-    emailContent.innerHTML = `
-        <div class="link-card">
-            <p>QQ：3581544162@qq.com</p>
-            <p>Gmail：gzxx307@gmail.com</p>
-        </div>
-    `;
+    // Bilibili
+    const bilibiliContent = document.getElementById('mc-bilibili')?.querySelector('.mc-content');
+    if (bilibiliContent) {
+        bilibiliContent.innerHTML = `<img class="link-icon" src="https://cdn.simpleicons.org/bilibili/white" alt="Bilibili">`;
+    }
+
+    // GitHub
+    const githubContent = document.getElementById('mc-github')?.querySelector('.mc-content');
+    if (githubContent) {
+        githubContent.innerHTML = `
+            <svg width="40" height="40" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path fill="white" fill-rule="evenodd" clip-rule="evenodd"
+                    d="M12 0C5.37 0 0 5.37 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0 1 12 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.63-5.37-12-12-12z"/>
+            </svg>
+        `;
+    }
+
+    // 网易云
+    const neteaseContent = document.getElementById('mc-netease')?.querySelector('.mc-content');
+    if (neteaseContent) {
+        neteaseContent.innerHTML = `<img class="link-icon" src="https://cdn.simpleicons.org/neteasecloudmusic/white" alt="网易云音乐">`;
+    }
+
+    // 邮箱卡片，左 QQ ，右 Gmail
+    const emailContent = document.getElementById('mc-email')?.querySelector('.mc-content');
+    if (emailContent) {
+        emailContent.innerHTML = `
+            <div class="email-card">
+                <div class="email-item" id="mc-email-qq">
+                    <img class="link-icon" src="https://cdn.simpleicons.org/qq/white" alt="QQ邮箱">
+                </div>
+                <div class="email-divider"></div>
+                <div class="email-item" id="mc-email-gmail">
+                    <img class="link-icon" src="https://cdn.simpleicons.org/gmail/white" alt="Gmail">
+                </div>
+            </div>
+        `;
+        document.getElementById('mc-email-qq').addEventListener('click', e => {
+            e.stopPropagation();
+            window.open('https://mail.qq.com', '_blank');
+        });
+        document.getElementById('mc-email-gmail').addEventListener('click', e => {
+            e.stopPropagation();
+            window.open('https://mail.google.com', '_blank');
+        });
+    }
 
     registerLinkCards();
 }
