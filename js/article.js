@@ -29,6 +29,8 @@ function loadArticleList() {
     const container = document.getElementById('article-list');
     // 遍历所有文章数据，为每篇文章创建卡片
     filteredArticles.forEach(article => {
+        // 如果文件名为 "about_me.md"，则跳过该文章（不在列表中显示）
+        if (article.file === 'about_me.md') return;
         // 创建卡片 div 元素
         const card = document.createElement('div');
         // 添加样式类

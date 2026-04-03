@@ -25,7 +25,8 @@ document.getElementById('search-btn').addEventListener('click', () => {
 
 // 加载文章列表
 loadArticleList();
-
+// 加载关于页面
+loadAboutPage();
 
 // 触发主页入场动画（页面首次加载时也需要构建并展示卡片）
 PAGE_ANIMATIONS['page-main'].enter(document.getElementById('page-main'), true);
