@@ -1,10 +1,3 @@
-[![Typing SVG](https://readme-typing-svg.demolab.com/?lines=Tech+otakus+save+the+world.;Love+games+forever.)](https://git.io/typing-svg)
-
-![Profile Summary](https://github-profile-summary-cards.vercel.app/api/cards/profile-details?username=gzxx307&theme=radical)
-![GitHub Streak](https://streak-stats.demolab.com/?user=gzxx307&theme=radical)
-[![Ashutosh's github activity graph](https://github-readme-activity-graph.vercel.app/graph?username=gzxx307&theme=react)](https://github.com/ashutosh00710/github-readme-activity-graph)
-
-> 为什么我的提交这么少？因为全在整乱七八糟的比赛的闭源代码！
 
 欢迎来到我的鸽子窝！（别问为什么叫鸽子窝，因为我容易放别人鸽子（bushi
 

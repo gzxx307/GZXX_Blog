@@ -4,9 +4,11 @@ Tags: UE, 经验, 知识
 
 这个文档的目标一个是学会使用PCG，了解PCG在UE中的使用方法，如果有时间则可以挖掘其相对底层的原理，另外就是研究布尔运算与PCG的结合使用。
 
-**官方文档**：https://dev.epicgames.com/documentation/zh-cn/unreal-engine/procedural-content-generation-framework-in-unreal-engine
-**初级教学视频**：https://www.bilibili.com/video/BV1R8YvzsEoL/?spm_id_from=333.337.search-card.all.click&vd_source=0748f696e1bda1e6909280682b804700
-**基础教学贴**：https://zhuanlan.zhihu.com/p/648208410
+> **官方文档**：https://dev.epicgames.com/documentation/zh-cn/unreal-engine/procedural-content-generation-framework-in-unreal-engine
+> 
+> **初级教学视频**：https://www.bilibili.com/video/BV1R8YvzsEoL/?spm_id_from=333.337.search-card.all.click&vd_source=0748f696e1bda1e6909280682b804700
+> 
+> **基础教学贴**：https://zhuanlan.zhihu.com/p/648208410
 
 ## 概述
 
