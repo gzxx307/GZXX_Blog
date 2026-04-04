@@ -1,5 +1,7 @@
 # GAMES课程 - 101
 
+Tags: 计算机图形学, GAMES, 笔记
+
 > 视频：https://www.bilibili.com/video/BV1X7411F744
 >
 > 部分内容来自该视频评论区“达达挥大斧”的笔记
@@ -10,7 +12,7 @@
 
 判断向量前与后的信息，结果>0为同方向，<0为反方向
 
-vector_a · vector_b = {x_a,y_a} · {x_b, y_b} = x_a\*x_b + y_a\*y_b
+vector_a · vector_b = [x_a,y_a] · [x_b, y_b] = x_a\*x_b + y_a\*y_b
 
 ### 向量的叉乘
 
@@ -28,11 +30,11 @@ a×b得到结果是和z轴同向，是正的，说明b在a的左侧
 
 假设有一点P与三角形ABC
 
-AB×AP > 0  说明P在AB左侧
+AB×AP > 0 说明P在AB左侧
 
-BC×BP > 0  说明P在BC左侧
+BC×BP > 0 说明P在BC左侧
 
-CA×CP > 0  说明P在CA左侧
+CA×CP > 0 说明P在CA左侧
 
 说明点P落在三角形ABC内部
 
@@ -59,7 +61,7 @@ CA×CP > 0  说明P在CA左侧
 
 **单位矩阵乘向量（用于变换）**
 
-{{-1,0},{0,1}} * {x,y} == {-x,y}
+[[-1,0],[0,1]] * [x,y] == [-x,y]
 
 **矩阵的转置**
 
@@ -77,7 +79,7 @@ x_i_j -> x_j_i
 
 **缩放变换**
 
-{{s_x,0},{0,s_y}}就叫缩放矩阵，与xy点乘得到缩放后的矩阵
+[[s_x,0],[0,s_y]]就叫缩放矩阵，与xy点乘得到缩放后的矩阵
 
 ![scale](games101/scale.png)
 
@@ -91,13 +93,13 @@ x_i_j -> x_j_i
 
 **错切变换**
 
-{{1,a},{b,1}} 每个点添加bx+ay的偏移量。
+[[1,a],[b,1]] 每个点添加bx+ay的偏移量。
 
 **旋转变换**
 
 默认逆时针旋转
 
-{{cos_theta,-sin_theta},{sin_theta,cos_theta}}
+[[cos_theta,-sin_theta],[sin_theta,cos_theta]]
 
 ![rotation](games101/rotation.png)
 
@@ -220,13 +222,13 @@ x_i_j -> x_j_i
 
 根据相似三角形定理，取一点(x,y,z,1)做变换，若近平面的对应点的深度为n，那么则首先有：
 
-{x,y,z,1} => {nx/z,ny/z,unknown,1}
+[x,y,z,1] => [nx/z,ny/z,unknown,1]
 
 此时z轴未知，后面我们会推导出来
 
-将这个点的所有坐标同时乘z得{nx,ny,unknown,z}，得到有某一矩阵M，满足：
+将这个点的所有坐标同时乘z得[nx,ny,unknown,z]，得到有某一矩阵M，满足：
 
-M·{x,y,z,1} = {nx,ny,unknown,z}
+M·[x,y,z,1] = [nx,ny,unknown,z]
 
 可推导出矩阵的一部分，如下图
 
@@ -237,9 +239,9 @@ M·{x,y,z,1} = {nx,ny,unknown,z}
 1. 近平面的点不会发生变化
 2. 远平面的点z的值不会发生变化
 
-应用于近平面的矩阵时，我们可以用n取代z，得到近平面的最终矩阵为{nx,ny,n<sup>2</sup>,n}，推出矩阵的形式必为{0,0,A,B}的形式，且**An+B = n<sup>2</sup>**
+应用于近平面的矩阵时，我们可以用n取代z，得到近平面的最终矩阵为[nx,ny,n<sup>2</sup>,n]，推出矩阵的形式必为[0,0,A,B]的形式，且**An+B = n<sup>2</sup>**
 
-对于远平面，中心点{0,0,z,1}经矩阵变化后仍然是中心点{0,0,z,1}，得**Az+B = f<sup>2</sup>**
+对于远平面，中心点[0,0,z,1]经矩阵变化后仍然是中心点[0,0,z,1]，得**Az+B = f<sup>2</sup>**
 
 解得A=n+f,B=-nf
 
