@@ -97,6 +97,8 @@ x_i_j -> x_j_i
 
 [[1,a],[b,1]] 每个点添加bx+ay的偏移量。
 
+![sm](games101/shear-matrix.png)
+
 **旋转变换**
 
 默认逆时针旋转
