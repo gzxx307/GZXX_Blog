@@ -7,7 +7,7 @@ const _CAT_MS = 380;
 // 相邻卡片延迟（毫秒）
 const _CAT_STAGGER = 50;
 
-PAGE_ANIMATIONS['page-categories'] = {
+PAGE_ANIMATIONS['page-projects'] = {
     enter(el, forward) {
         return new Promise(resolve => {
             // 覆盖 CSS 的 translateX(100%)，使页面显示在可见位置，不设 opacity 避免破坏 backdrop-filter

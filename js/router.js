@@ -3,7 +3,7 @@
  */
 
 // 页面顺序定义，决定切换方向（靠后 = 向右/前进，靠前 = 向左/后退）
-const PAGE_ORDER = ['page-main', 'page-article', 'page-article-detail', 'page-categories', 'page-about'];
+const PAGE_ORDER = ['page-main', 'page-article', 'page-article-detail', 'page-projects', 'page-about'];
 
 // 动画锁：为 true 时忽略新的导航请求，防止动画叠加
 let isAnimating = false;
