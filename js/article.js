@@ -63,16 +63,32 @@ marked.use({
     }
 });
 
-// 打开文章详情页：将 Markdown 解析为 HTML 并导航至详情页
-function openArticle(article) {
+// 将文章的标签与正文渲染到详情页 DOM，不执行任何导航
+function _renderArticleContent(article) {
     // 将 tags 数组转为标签 HTML
     const tagsHtml = article.tags.map(tag => `<span class="article-tag">${tag}</span>`).join('');
     // 渲染标签列表
     document.getElementById('article-detail-tags').innerHTML = `<div class="article-tags">${tagsHtml}</div>`;
     // 将 Markdown 内容解析为 HTML 并写入详情页容器
     document.getElementById('article-content').innerHTML = marked.parse(article.content);
-    // 切换到文章详情页
+}
+
+// 打开文章详情页：渲染内容、设置 slug、执行带动画的导航
+function openArticle(article) {
+    _renderArticleContent(article);
+    // 将文件名去掉 .md 后缀作为 slug，供 router.js 构建 hash 使用
+    _currentArticleSlug = article.file.replace('.md', '');
     navigateTo('page-article-detail');
+}
+
+// 根据 slug 恢复文章内容与 slug 状态，返回是否找到文章
+// 不执行导航，由调用方（hashchange 监听器或 main.js 初始化）决定后续行为
+function restoreArticle(slug) {
+    const article = ARTICLES_DATA.find(a => a.file === slug + '.md');
+    if (!article) return false;
+    _renderArticleContent(article);
+    _currentArticleSlug = slug;
+    return true;
 }
 
 // 搜索文章，根据输入关键词过滤文章列表
