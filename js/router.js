@@ -9,6 +9,8 @@ const PAGE_ORDER = ['page-main', 'page-article', 'page-article-detail', 'page-pr
 let isAnimating = false;
 
 // 当前打开的文章 slug（文件名去掉 .md），由 article.js 在调用 navigateTo 前赋值
+// 声明在此处的原因：_setHash 构建 hash 时需要读取这个值，放在 router.js 中使
+// article.js 和 router.js 都能直接访问，不需要通过函数参数传递
 let _currentArticleSlug = null;
 
 // 标志位：代码主动修改 hash 时置 true，防止 hashchange 事件循环触发导航
@@ -33,8 +35,12 @@ function _buildHash(pageId) {
 // 将 hash 写入地址栏，并在下一个事件循环重置标志
 // hashchange 事件在同步赋值后异步触发，setTimeout(0) 确保标志在回调执行前仍为 true
 function _setHash(pageId) {
+    // 先置标志、再写 hash，保证 hashchange 回调触发时标志已为 true
     _programmaticHash = true;
     window.location.hash = _buildHash(pageId);
+    // 必须用 setTimeout(0) 而非同步重置：hashchange 事件虽然由同步赋值触发，
+    // 但回调本身在当前同步代码执行完毕后才进入事件队列，setTimeout(0) 同理，
+    // 两者都在同一个"下一次事件循环"执行，确保标志在回调执行完之后才被清除
     setTimeout(() => { _programmaticHash = false; }, 0);
 }
 
@@ -62,6 +68,7 @@ function _getExit(pageId) {
 // 切换到指定页面
 // silent 为 true 时直接切换 class，不播放动画（专用于页面初始化）
 function navigateTo(targetId, silent = false) {
+    // silent 模式专供初始化使用，此时页面还没有播放过任何动画，不受动画锁约束
     if (!silent && isAnimating) return;
 
     const current = document.querySelector('.page.active');
@@ -101,8 +108,10 @@ window.addEventListener('hashchange', () => {
     // 代码主动写入的 hash 变化，直接忽略
     if (_programmaticHash) return;
 
-    // 动画进行中无法导航：恢复 hash 到当前激活页，防止 URL/页面状态不同步
     if (isAnimating) {
+        // 动画进行中无法打断导航；若放任 hash 变化，地址栏会显示后退目标页的 URL，
+        // 但屏幕上仍是动画中的页面——用户此时刷新会跳到错误的页面，造成状态不同步
+        // 解决方法：把 hash 强制恢复为当前激活页，相当于"撤销"这次后退操作
         const activeId = document.querySelector('.page.active')?.id;
         if (activeId) _setHash(activeId);
         return;

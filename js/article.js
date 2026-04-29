@@ -76,13 +76,16 @@ function _renderArticleContent(article) {
 // 打开文章详情页：渲染内容、设置 slug、执行带动画的导航
 function openArticle(article) {
     _renderArticleContent(article);
-    // 将文件名去掉 .md 后缀作为 slug，供 router.js 构建 hash 使用
+    // 必须在 navigateTo 之前赋值：navigateTo 内部调用 _setHash 时会立即读取此变量来
+    // 构建 hash 字符串，若赋值在 navigateTo 之后，_setHash 拿到的仍是 null，
+    // 地址栏会错误地变成 #/article/ 而非 #/article/docker
     _currentArticleSlug = article.file.replace('.md', '');
     navigateTo('page-article-detail');
 }
 
 // 根据 slug 恢复文章内容与 slug 状态，返回是否找到文章
-// 不执行导航，由调用方（hashchange 监听器或 main.js 初始化）决定后续行为
+// 不在内部调用 navigateTo 的原因：初始化时需要 silent=true 静默切换，hashchange 时
+// 需要带动画正常切换，两个场景对 navigateTo 的调用方式不同，由调用方自己决定更灵活
 function restoreArticle(slug) {
     const article = ARTICLES_DATA.find(a => a.file === slug + '.md');
     if (!article) return false;
