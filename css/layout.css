@@ -18,6 +18,29 @@
     height: 100%;
     overflow-y: auto;
     transform: translateX(100%);
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+}
+
+/* 滚动条整体宽度 */
+.page::-webkit-scrollbar {
+    width: 6px;
+}
+
+/* 滚动条轨道 */
+.page::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+/* 滚动条滑块 */
+.page::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 3px;
+}
+
+/* 滑块悬停 */
+.page::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.5);
 }
 
 /* 当前激活的页面居中显示 */
