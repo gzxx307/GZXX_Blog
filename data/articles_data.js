@@ -7,9 +7,9 @@ const ARTICLES_DATA = [
                "经验",
                "知识"
           ],
-          "excerpt": "",
+          "excerpt": "> **UE版本：5.7 | Gameplay Camera插件版本：0.1 (experimental)** > > IDE: JetBrains Rider 2025.3.0.2",
           "date": "2026-05-08",
-          "content": "# UE实验性功能：Gameplay Camera\r\n\r"
+          "content": "# UE实验性功能：Gameplay Camera\r\n\r\n\r\n## 前言\r\n\r\n> **UE版本：5.7 | Gameplay Camera插件版本：0.1 (experimental)**\r\n> \r\n> IDE: JetBrains Rider 2025.3.0.2\r\n\r\n不同版本的蓝图操作以及功能不同，如果版本不同需要另外再看\r\n\r\n而且目前UE官方还没有完成文档（或者说官方已经基本放弃写文档了），所以学起来会很麻烦\r\n\r\n我是直接看的插件C++源码，后面开个claude code帮我解释大体的结构以及模块设计理念、为什么要这么设计之类的\r\n\r\n> [官方文档链接](https://dev.epicgames.com/documentation/unreal-engine/gameplay-camera-system?application_version=5.7&lang=zh-CN)\r\n\r\n这个官方文档用的似乎还是UE5.5版本的Gameplay Camera插件，所以跟我的实际实现不一样\r\n\r\n所以**以下内容全都是我在UE版本为5.7的时候写的**，源码也参考5.7\r\n\r\n另外，还需要确保你启用了Gameplay Camera插件\r\n\r\n## 蓝图简单操作\r\n\r\n首先介绍一下蓝图里怎么使用\r\n\r\n> 这里首先介绍蓝图里的一些数据结构的基础结构与操作，具体的节点功能后面再说\r\n\r\n\r\n\r\n## 蓝图与源码对应\r\n\r\n> 启用了该插件时，该插件的源码位置在我的电脑中的位置：\r\n> \r\n> Engine/UE5/Plugins/Cameras/GameplayCameras/Source/GameplayCameras\r\n\r\n"
      },
      {
           "file": "study_cmake.md",

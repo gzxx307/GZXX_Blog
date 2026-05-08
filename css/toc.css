@@ -3,7 +3,6 @@
  */
 
 /* 宽屏：TOC 面板固定在 main（最大宽度 1100px）右侧的留白区 */
-/* 暗色纯 CSS 背景下毛玻璃不存在双层叠加问题，可正常使用 backdrop-filter */
 #toc-panel {
     position: fixed;
     top: 100px;
@@ -12,23 +11,21 @@
     max-height: calc(100vh - 120px);
     overflow-y: auto;
     z-index: 50;
-    background-color: rgba(255, 255, 255, 0.07);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 16px;
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
     padding: 14px;
     color: #fff;
     scrollbar-width: none;
+    background-color: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
 }
 
-/* 目录标题：细小大写字母，底部细分隔线 */
+/* 目录标题：底部细分隔线 */
 .toc-panel-title {
-    font-size: 9px;
-    color: rgba(255, 255, 255, 0.35);
-    letter-spacing: 1.5px;
-    text-transform: uppercase;
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.5);
+    letter-spacing: 1px;
     margin-bottom: 10px;
     padding-bottom: 8px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
@@ -172,11 +169,6 @@
         right: 16px;
         width: 220px;
         max-height: 50vh;
-        /* 窄屏面板浮于文章卡片之上，用不透明深色避免双层毛玻璃叠加 */
-        background-color: rgba(12, 6, 30, 0.95);
-        backdrop-filter: none;
-        -webkit-backdrop-filter: none;
-        border-color: rgba(255, 255, 255, 0.08);
     }
 
     /* 窄屏展开状态 */

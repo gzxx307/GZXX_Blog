@@ -3,7 +3,7 @@
  */
 
 /* 导航栏：粘性定位在顶部，始终覆盖页面内容 */
-nav {
+.site-nav {
     position: sticky;
     top: 0;
     z-index: 100;
@@ -12,7 +12,7 @@ nav {
 }
 
 /* 通过伪元素承载毛玻璃效果，z-index: -1 使其位于 nav 内容层之后 */
-nav::before {
+.site-nav::before {
     content: '';
     position: absolute;
     inset: 0;
