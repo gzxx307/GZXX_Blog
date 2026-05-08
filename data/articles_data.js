@@ -1,5 +1,17 @@
 const ARTICLES_DATA = [
      {
+          "file": "study_ue_gameplaycamera.md",
+          "title": "UE实验性功能：Gameplay Camera",
+          "tags": [
+               "UE",
+               "经验",
+               "知识"
+          ],
+          "excerpt": "",
+          "date": "2026-05-08",
+          "content": "# UE实验性功能：Gameplay Camera\r\n\r"
+     },
+     {
           "file": "study_cmake.md",
           "title": "CMake简明教程",
           "tags": [

@@ -76,6 +76,11 @@ function navigateTo(targetId, silent = false) {
 
     if (!target || current === target) return;
 
+    // 离开文章详情页时销毁目录（toc.js 在此文件之后加载，用 typeof 防止未定义报错）
+    if (current.id === 'page-article-detail' && typeof destroyToc === 'function') {
+        destroyToc();
+    }
+
     // 更新地址栏 hash
     _setHash(targetId);
 

@@ -71,6 +71,8 @@ function _renderArticleContent(article) {
     document.getElementById('article-detail-tags').innerHTML = `<div class="article-tags">${tagsHtml}</div>`;
     // 将 Markdown 内容解析为 HTML 并写入详情页容器
     document.getElementById('article-content').innerHTML = marked.parse(article.content);
+    // 内容写入后立即初始化目录
+    initToc();
 }
 
 // 打开文章详情页：渲染内容、设置 slug、执行带动画的导航

@@ -1,0 +1,183 @@
+/**
+ * 文章详情页目录（TOC）样式：fixed 定位于 main 右侧留白区，窄屏折叠为浮动按钮。
+ */
+
+/* 宽屏：TOC 面板固定在 main（最大宽度 1100px）右侧的留白区 */
+/* 不使用 backdrop-filter，避免与页面其他毛玻璃层叠加产生双重模糊 */
+#toc-panel {
+    position: fixed;
+    top: 100px;
+    left: calc(50% + 550px + 16px);
+    width: 200px;
+    max-height: calc(100vh - 120px);
+    overflow-y: auto;
+    z-index: 50;
+    background-color: rgba(15, 25, 50, 0.72);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 16px;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
+    padding: 14px;
+    color: #fff;
+    scrollbar-width: none;
+}
+
+/* 目录标题：细小大写字母，底部细分隔线 */
+.toc-panel-title {
+    font-size: 9px;
+    color: rgba(255, 255, 255, 0.35);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* ol 列表：清除默认样式 */
+.toc-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+/* 子级列表：不缩进不显示辅助线，层级由 .toc-link 的 padding-left 控制 */
+.toc-child {
+    padding-left: 0;
+    margin-left: 0;
+}
+
+/* 每条目录项 */
+.toc-item {
+    margin-bottom: 2px;
+}
+
+/* 目录链接：flex 对齐圆点与文字，左侧 border 作为激活竖线指示器 */
+.toc-link {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 3px 4px 3px 6px;
+    color: rgba(255, 255, 255, 0.5);
+    text-decoration: none;
+    font-size: 13px;
+    line-height: 1.5;
+    border-left: 2px solid transparent;
+    border-radius: 0 5px 5px 0;
+    transition: color 0.2s, border-color 0.15s;
+}
+
+/* h2 级：字号缩小，向右缩进 */
+.toc-level-2 > .toc-link {
+    font-size: 12px;
+    padding-left: 16px;
+    color: rgba(255, 255, 255, 0.45);
+}
+
+/* h3 级：字号最小，颜色最淡，缩进更深 */
+.toc-level-3 > .toc-link {
+    font-size: 11px;
+    padding-left: 26px;
+    color: rgba(255, 255, 255, 0.35);
+}
+
+/* 圆点指示器：默认空心小圆 */
+.toc-dot {
+    flex-shrink: 0;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(255, 255, 255, 0.25);
+    transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
+}
+
+/* h1 的圆点略大 */
+.toc-level-1 > .toc-link .toc-dot {
+    width: 6px;
+    height: 6px;
+}
+
+/* h3 的圆点略小 */
+.toc-level-3 > .toc-link .toc-dot {
+    width: 4px;
+    height: 4px;
+}
+
+/* 目录文本：超长时截断 */
+.toc-text {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* 鼠标悬停：提亮文字 */
+.toc-link:hover {
+    color: rgba(255, 255, 255, 0.85);
+}
+
+/* 祖先激活项：文字略提亮，表示当前章节所在的父级 */
+.toc-link.active {
+    color: rgba(255, 255, 255, 0.7);
+}
+
+/* 当前激活项：绿色文字 + 左侧绿色竖线 */
+.toc-link.active-current {
+    color: #54e0b4;
+    border-left-color: #54e0b4;
+}
+
+/* 当前激活项的圆点：实心绿色，带发光 */
+.toc-link.active-current .toc-dot {
+    background: #54e0b4;
+    border-color: #54e0b4;
+    box-shadow: 0 0 7px rgba(84, 224, 180, 0.6);
+}
+
+/* 窄屏浮动切换按钮：fixed 定位在右下角 */
+#toc-toggle-btn {
+    position: fixed;
+    bottom: 24px;
+    right: 20px;
+    width: 40px;
+    height: 40px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    color: #fff;
+    cursor: pointer;
+    z-index: 50;
+    transition: background-color 0.2s, border-color 0.2s;
+}
+
+/* 按钮悬停：略微提亮，边框带主题色 */
+#toc-toggle-btn:hover {
+    background-color: rgba(255, 255, 255, 0.22);
+    border-color: rgba(84, 224, 180, 0.5);
+}
+
+/* 窄屏断点：隐藏宽屏面板，显示切换按钮 */
+@media (max-width: 1400px) {
+    #toc-panel {
+        display: none;
+        position: fixed;
+        top: auto;
+        left: auto;
+        bottom: 72px;
+        right: 16px;
+        width: 220px;
+        max-height: 50vh;
+    }
+
+    /* 窄屏展开状态 */
+    #toc-panel.toc-open {
+        display: block;
+    }
+
+    #toc-toggle-btn {
+        display: flex;
+    }
+}
