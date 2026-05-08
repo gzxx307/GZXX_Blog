@@ -9,24 +9,21 @@
     box-sizing: border-box;
 }
 
-/* 页面主体：设置字体、视口高度与固定背景图 */
+/* 页面主体：深夜蓝黑底色，光晕与粒子效果由 js/bg-effect.js 的 Canvas 负责 */
 body {
     font-family: "Microsoft YaHei", sans-serif;
     min-height: 100vh;
-    background-image: url("https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1920&q=80");
-    background-size: cover;
-    background-position: center;
-    background-attachment: fixed;
+    background-color: #0f0f17;
 }
 
-/* 毛玻璃卡片，被导航栏和文章卡片复用 */
+/* 毛玻璃卡片，暗色背景专用参数：降低白色不透明度，加深阴影 */
 .card {
-    background-color: rgba(255, 255, 255, 0.15);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.25);
+    background-color: rgba(255, 255, 255, 0.07);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 16px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
     padding: 24px;
     color: #fff;
 }
