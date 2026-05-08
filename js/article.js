@@ -73,6 +73,46 @@ function _renderArticleContent(article) {
     document.getElementById('article-content').innerHTML = marked.parse(article.content);
     // 内容写入后立即初始化目录
     initToc();
+
+    // 构建可导航文章列表（排除 about_me.md）
+    const navList = ARTICLES_DATA.filter(a => a.file !== 'about_me.md');
+    const currentIndex = navList.findIndex(a => a.file === article.file);
+    const scrollEl = document.getElementById('page-article-detail');
+
+    const prevBtn = document.getElementById('prev-article-btn');
+    const nextBtn = document.getElementById('next-article-btn');
+
+    // 上一篇：在数组中排在前面的文章
+    const prevArticle = currentIndex > 0 ? navList[currentIndex - 1] : null;
+    if (prevArticle) {
+        prevBtn.textContent = '← ' + prevArticle.title;
+        prevBtn.style.display = '';
+        prevBtn.onclick = () => {
+            switchArticleInPlace(() => {
+                scrollEl.scrollTop = 0;
+                _currentArticleSlug = prevArticle.file.replace('.md', '');
+                _renderArticleContent(prevArticle);
+            });
+        };
+    } else {
+        prevBtn.style.display = 'none';
+    }
+
+    // 下一篇：在数组中排在后面的文章
+    const nextArticle = currentIndex < navList.length - 1 ? navList[currentIndex + 1] : null;
+    if (nextArticle) {
+        nextBtn.textContent = nextArticle.title + ' →';
+        nextBtn.style.display = '';
+        nextBtn.onclick = () => {
+            switchArticleInPlace(() => {
+                scrollEl.scrollTop = 0;
+                _currentArticleSlug = nextArticle.file.replace('.md', '');
+                _renderArticleContent(nextArticle);
+            });
+        };
+    } else {
+        nextBtn.style.display = 'none';
+    }
 }
 
 // 打开文章详情页：渲染内容、设置 slug、执行带动画的导航

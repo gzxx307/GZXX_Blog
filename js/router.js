@@ -74,15 +74,17 @@ function navigateTo(targetId, silent = false) {
     const current = document.querySelector('.page.active');
     const target  = document.getElementById(targetId);
 
-    if (!target || current === target) return;
+    if (!target) return;
+
+    // 无论是否同页，都更新 hash（同页切换文章时 URL 也需要反映新 slug）
+    if (!silent) _setHash(targetId);
+
+    if (current === target) return;
 
     // 离开文章详情页时销毁目录（toc.js 在此文件之后加载，用 typeof 防止未定义报错）
     if (current.id === 'page-article-detail' && typeof destroyToc === 'function') {
         destroyToc();
     }
-
-    // 更新地址栏 hash
-    _setHash(targetId);
 
     if (silent) {
         // 静默切换：仅操作 class，不触发动画系统
@@ -104,6 +106,24 @@ function navigateTo(targetId, silent = false) {
     }).then(() => {
         target.classList.add('active');
         target.style.cssText = '';
+        isAnimating = false;
+    });
+}
+
+/**
+ * 在文章详情页内切换文章：播放退出动画 → 执行渲染回调 → 播放进入动画。
+ * @param {Function} onRender - 渲染回调，负责更新 _currentArticleSlug 并渲染新内容
+ */
+function switchArticleInPlace(onRender) {
+    if (isAnimating) return;
+    const el = document.getElementById('page-article-detail');
+    if (!el) return;
+    isAnimating = true;
+    _getExit('page-article-detail')(el, false).then(() => {
+        onRender();
+        _setHash('page-article-detail');
+        return _getEnter('page-article-detail')(el, false);
+    }).then(() => {
         isAnimating = false;
     });
 }

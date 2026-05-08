@@ -138,6 +138,28 @@
     background: rgba(255, 255, 255, 0.15);
 }
 
+/* 文章底部前后篇导航行：两端对齐，顶部细分隔线 */
+.article-bottom-nav {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 32px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* 前后篇按钮：限制宽度，超长标题用省略号截断 */
+.article-nav-btn {
+    max-width: 45%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* 下一篇按钮：始终贴右，无论上一篇是否存在 */
+#next-article-btn {
+    margin-left: auto;
+}
+
 /* 文章内容容器 */
 #article-content {
     color: #fff;
