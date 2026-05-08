@@ -67,8 +67,8 @@ marked.use({
 function _renderArticleContent(article) {
     // 将 tags 数组转为标签 HTML
     const tagsHtml = article.tags.map(tag => `<span class="article-tag">${tag}</span>`).join('');
-    // 渲染标签列表
-    document.getElementById('article-detail-tags').innerHTML = `<div class="article-tags">${tagsHtml}</div>`;
+    // 渲染标签列表到 TOC 面板顶部
+    document.getElementById('toc-tags').innerHTML = tagsHtml;
     // 将 Markdown 内容解析为 HTML 并写入详情页容器
     document.getElementById('article-content').innerHTML = marked.parse(article.content);
     // 内容写入后立即初始化目录

@@ -21,6 +21,21 @@
     border-radius: 12px;
 }
 
+/* 标签区：底部分隔线，与目录标题之间留出间距 */
+.toc-tags-section {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-bottom: 10px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* 标签区为空时隐藏，避免留出多余间距 */
+.toc-tags-section:empty {
+    display: none;
+}
+
 /* 目录标题：底部细分隔线 */
 .toc-panel-title {
     font-size: 14px;

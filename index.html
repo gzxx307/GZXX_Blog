@@ -50,7 +50,6 @@
             <main>
                 <div class="card">
                     <button class="back-btn" id="back-btn">返回文章列表</button>
-                    <div id="article-detail-tags"></div>
                     <div id="article-content"></div>
                 </div>
             </main>
@@ -92,6 +91,7 @@
     <!-- TOC 容器置于 body 末尾，脱离 .page 的 transform 影响，使 fixed 定位相对视口生效 -->
     <div id="toc-container" style="display:none">
         <div id="toc-panel">
+            <div id="toc-tags" class="toc-tags-section"></div>
             <div class="toc-panel-title">目录</div>
             <nav id="toc-nav"></nav>
         </div>

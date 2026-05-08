@@ -242,4 +242,7 @@ function destroyToc() {
     // 收起窄屏面板
     const panel = document.getElementById('toc-panel');
     if (panel) panel.classList.remove('toc-open');
+    // 清空标签区
+    const tags = document.getElementById('toc-tags');
+    if (tags) tags.innerHTML = '';
 }
