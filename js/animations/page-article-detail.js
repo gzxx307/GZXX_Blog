@@ -1,5 +1,6 @@
 /**
  * 文章详情页动画：进入时卡片从下方滑入，向后退出时卡片向下滑出，向前退出时水平滑出。
+ * TOC 面板在进入时从右侧淡入，退出时向右淡出。
  */
 
 // 进入动画时长（毫秒）
@@ -17,8 +18,11 @@ PAGE_ANIMATIONS['page-article-detail'] = {
 
             // 获取页面内所有卡片
             const cards = Array.from(el.querySelectorAll('.card'));
-            // 若无卡片则直接完成
-            if (cards.length === 0) { resolve(); return; }
+            // toc-panel 挂在 body 末尾，需单独获取
+            const tocPanel = document.getElementById('toc-panel');
+
+            // 若无卡片且无 toc 则直接完成
+            if (cards.length === 0 && !tocPanel) { resolve(); return; }
 
             // 初始状态：各卡片下移 30px 且透明
             cards.forEach(card => {
@@ -26,6 +30,13 @@ PAGE_ANIMATIONS['page-article-detail'] = {
                 card.style.transform = 'translateY(30px)';
                 card.style.opacity = '0';
             });
+
+            // toc 初始状态：右偏 10px 且透明
+            if (tocPanel) {
+                tocPanel.style.transition = 'none';
+                tocPanel.style.transform = 'translateX(10px)';
+                tocPanel.style.opacity = '0';
+            }
 
             // 双层 rAF 确保初始状态渲染后再开启过渡
             requestAnimationFrame(() => {
@@ -39,10 +50,19 @@ PAGE_ANIMATIONS['page-article-detail'] = {
                         card.style.opacity = '1';
                     });
 
+                    // toc 与第一张卡同步淡入，延迟一个 stagger
+                    if (tocPanel) {
+                        tocPanel.style.transition = `transform ${_DETAIL_ENTER_MS}ms cubic-bezier(0.4, 0, 0.2, 1) ${_DETAIL_STAGGER}ms,`
+                                                  + `opacity ${_DETAIL_ENTER_MS}ms ease ${_DETAIL_STAGGER}ms`;
+                        tocPanel.style.transform = 'translateX(0)';
+                        tocPanel.style.opacity = '1';
+                    }
+
                     // 等待所有卡片动画结束后清理内联样式
                     const total = _DETAIL_ENTER_MS + (cards.length - 1) * _DETAIL_STAGGER;
                     setTimeout(() => {
                         cards.forEach(card => { card.style.cssText = ''; });
+                        if (tocPanel) tocPanel.style.cssText = '';
                         resolve();
                     }, total + 20);
                 });
@@ -51,13 +71,14 @@ PAGE_ANIMATIONS['page-article-detail'] = {
     },
 
     exit(el, forward) {
-        // 向后（返回文章列表）：各卡片向下淡出
+        // 向后（返回文章列表）：各卡片向下淡出，toc 向右淡出
         if (!forward) {
             return new Promise(resolve => {
                 // 反向遍历：最后进入的卡片最先退出
                 const cards = Array.from(el.querySelectorAll('.card')).reverse();
-                // 若无卡片则直接完成
-                if (cards.length === 0) { resolve(); return; }
+                const tocPanel = document.getElementById('toc-panel');
+
+                if (cards.length === 0 && !tocPanel) { resolve(); return; }
 
                 // 依次为每张卡片设置向下淡出过渡
                 cards.forEach((card, i) => {
@@ -68,10 +89,19 @@ PAGE_ANIMATIONS['page-article-detail'] = {
                     card.style.opacity = '0';
                 });
 
+                // toc 同步向右淡出
+                if (tocPanel) {
+                    tocPanel.style.transition = `transform ${_DETAIL_EXIT_MS}ms cubic-bezier(0.4, 0, 0.2, 1),`
+                                              + `opacity ${_DETAIL_EXIT_MS}ms ease`;
+                    tocPanel.style.transform = 'translateX(10px)';
+                    tocPanel.style.opacity = '0';
+                }
+
                 // 等待所有退出动画完成后清理内联样式
                 const total = _DETAIL_EXIT_MS + (cards.length - 1) * _DETAIL_STAGGER;
                 setTimeout(() => {
                     cards.forEach(card => { card.style.cssText = ''; });
+                    if (tocPanel) tocPanel.style.cssText = '';
                     resolve();
                 }, total + 20);
             });

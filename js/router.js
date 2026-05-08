@@ -81,17 +81,21 @@ function navigateTo(targetId, silent = false) {
 
     if (current === target) return;
 
-    // 离开文章详情页时销毁目录（toc.js 在此文件之后加载，用 typeof 防止未定义报错）
-    if (current.id === 'page-article-detail' && typeof destroyToc === 'function') {
-        destroyToc();
-    }
-
     if (silent) {
         // 静默切换：仅操作 class，不触发动画系统
         current.classList.remove('active');
         current.style.cssText = '';
         target.classList.add('active');
         target.style.cssText = '';
+        // 静默切换时直接销毁目录
+        if (current.id === 'page-article-detail' && typeof destroyToc === 'function') {
+            destroyToc();
+        }
+        // 刷新直达文章详情页时跳过动画，直接清除预隐藏的 opacity
+        if (targetId === 'page-article-detail') {
+            const tocPanel = document.getElementById('toc-panel');
+            if (tocPanel) tocPanel.style.opacity = '';
+        }
         return;
     }
 
@@ -102,6 +106,10 @@ function navigateTo(targetId, silent = false) {
     _getExit(current.id)(current, forward).then(() => {
         current.classList.remove('active');
         current.style.cssText = '';
+        // 退出动画结束后再销毁目录，避免 destroyToc 提前隐藏 TOC 打断退出动画
+        if (current.id === 'page-article-detail' && typeof destroyToc === 'function') {
+            destroyToc();
+        }
         return _getEnter(targetId)(target, forward);
     }).then(() => {
         target.classList.add('active');

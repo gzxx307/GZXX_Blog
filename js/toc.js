@@ -178,6 +178,8 @@ function initToc() {
     }
     // 显式设为 block，不能用 '' 回退——HTML 内联 style 默认值是 none
     container.style.display = 'block';
+    // 预隐藏面板，由进入动画负责淡入，防止在动画开始前提前可见
+    document.getElementById('toc-panel').style.opacity = '0';
 
     // 收集所有生成的 .toc-link 元素
     const links = document.querySelectorAll('#toc-nav .toc-link');
