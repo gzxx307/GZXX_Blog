@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="css/layout.css">
     <link rel="stylesheet" href="css/article.css">
     <link rel="stylesheet" href="css/toc.css">
+    <link rel="stylesheet" href="css/lightbox.css">
     <link rel="stylesheet" href="css/page-main.css">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
@@ -108,7 +109,13 @@
         </button>
     </div>
 
+    <!-- 灯箱覆盖层：置于 body 末尾，避免被 .page 的 transform 影响 fixed 定位 -->
+    <div id="lightbox-overlay">
+        <img id="lightbox-img">
+    </div>
+
     <script src="js/router.js"></script>
+    <script src="js/lightbox.js"></script>
     <script src="js/article.js"></script>
     <script src="js/toc.js"></script>
     <script src="js/main.js"></script>

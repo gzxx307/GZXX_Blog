@@ -71,8 +71,9 @@ function _renderArticleContent(article) {
     document.getElementById('toc-tags').innerHTML = tagsHtml;
     // 将 Markdown 内容解析为 HTML 并写入详情页容器
     document.getElementById('article-content').innerHTML = marked.parse(article.content);
-    // 内容写入后立即初始化目录
+    // 内容写入后立即初始化目录与灯箱
     initToc();
+    initLightbox();
 
     // 构建可导航文章列表（排除 about_me.md）
     const navList = ARTICLES_DATA.filter(a => a.file !== 'about_me.md');
