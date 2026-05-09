@@ -55,7 +55,9 @@ Tags: UE, 经验, 知识
 
 创建好后，UE会自动将创建出来的蓝图类绑定到Camera Asset中
 
-然后我们先不管创建出来的蓝图，可以看到下面还有一个数组。添加元素后UE要求我们向其中填入`Camera Rig Proxy`与`Camera Rig`，即摄像机绑定代理和摄像机绑定。实际上这里的Camera Rig Proxy不是必须的，这个类我们现在也暂时忽略，之后会讲到
+然后我们先不管创建出来的蓝图，可以看到下面还有一个table。添加元素后UE要求我们向其中填入`Camera Rig Proxy`与`Camera Rig`，即摄像机绑定代理和摄像机绑定。实际上这里的Camera Rig Proxy不是必须的，这个类我们现在也暂时忽略，之后会讲到
+
+> 这里的table实际上是Proxy->Rig映射表，且该表不属于CameraAsset，这个后面讲
 
 这时再回到目录中，我们继续创建一个Camera Rig，命名为`CR_MyCamera1`，并在Camera Asset的数组元素的Camera Rig属性中绑定这一资产
 
@@ -81,7 +83,9 @@ Tags: UE, 经验, 知识
 
 至此，就是所有基础操作
 
-## 蓝图工程中主要的类
+## 主要的类
+
+> 为了更好理解每个类的作用，可以搭配[整体执行逻辑](#整体执行逻辑)一起食用
 
 ### Camera Asset
 
@@ -89,7 +93,7 @@ Tags: UE, 经验, 知识
 
 事实上，创建CameraAsset的时候选择的分类，实际上都是继承自UCameraAsset，只是他们的Director有所不同。在源码中，设计了Director不同时显示不同字段。
 
-所以实际上，选择CameraAsset分类的过程就是在选择Director的父类
+所以实际上，选择CameraAsset分类的过程就是在选择CameraDirector的父类
 
 ![cd](study_ue_gameplaycamera/choose_director.png)
 
@@ -97,11 +101,42 @@ CameraDirector顾名思义就是摄像机的"导演"，CameraAsset通过挂载Ca
 
 > 为什么要分开实现CameraAsset与CameraDirector？
 > 
-> 这需要与下面的CameraRigProxy合起来说，具体后面会写到
+> 这需要与下面的CameraRigProxy合起来说，具体后面会写到[摄像机绑定代理](#camera-rig-proxy)
 > 
 > 简单来说就是解耦数据层与控制层
 
-下面介绍了四个优先设计好的Director
+CameraAsset中还有一个“共享过渡”，共享过渡是当该CameraAsset上挂载的CameraRig没有定义过渡的Enter或Exit时，使用共享过渡的Enter或Exit
+
+> 过渡在后面的[过渡](#过渡)
+
+CameraRig的映射表放置所有该CameraAsset能够切换和调用的CameraRig，并通过DirectorEvaluator实现CameraRig或CameraRigProxy之间的切换
+
+在运行时，CameraAsset会被实例化，此时产生CameraEvaluationContext（CameraAsset中挂载数据、配置变量，而CameraEvaluationContext则是运行时状态）。运行时，同一个CameraAsset可以同时产生多个Context（比如多人游戏中每个玩家一个，类似PlayerState）
+
+### CameraEvaluationContext
+
+其存储了运行时状态
+
+### ChildCameraEvaluatorContext
+
+子Context本质还是上面的Context类，只是作为父Context的委托对象
+
+父Context的Director可以委托给子Context来决定摄像机行为，子Context拥有自己的CameraAsset和Director，运行自己独立的摄像机逻辑
+
+可以理解为父Context决定使用哪个子Context，之后的逻辑让子Context决定，这样就可以套娃
+
+子Context的创建有两种来源：
+
+1. 另一个UGameplayCameraComponent用InsertOrPush模式激活时，自动成为当前Context的子节点
+2. 通过C++代码主动创建
+
+### Camera Director
+
+UE目前为Director设计了四个不同的子类，每个子类都实现父类的虚函数OnBuildEvaluator，函数返回一个Evaluator。每个子类返回的Evaluator都是不同的，但都继承自FCameraDirectorEvaluator
+
+> 关于[CameraDirectorEvaluator](#camera-director-evaluator)在下面会讲到
+
+下面介绍四个子类
 
 #### 优先级队列摄像机导演 Priority Queue Camera Director
 
@@ -124,17 +159,114 @@ CameraDirector顾名思义就是摄像机的"导演"，CameraAsset通过挂载Ca
 
 #### 蓝图摄像机导演 Blueprint Camera Director
 
+当选择摄像机蓝图导演类时，CameraAsset要求挂载一个“摄像机导演评估器类”，但实际上，评估器类这个变量是通过蓝图摄像机导演暴露出来的，是蓝图摄像机导演拥有评估器类而不是CameraAsset，CameraAsset拥有的是蓝图摄像机导演
+
+蓝图摄像机导演是UCameraDirector的子类，作为数据层。且该子类只有一个变量即CameraDirectorEvaluatorClass（也就是在工程里被暴露出来的那个变量），其余所有属性均与父类相同
+
+蓝图摄像机导演评估器类本质上是一个Blueprintable的UObject，在使用蓝图继承的Evaluator中自定义摄像机的切换逻辑。Director的Evaluator通过调用蓝图中的函数来定义切换摄像机的逻辑
+
+关于蓝图摄像机导演评估器类，看[关于蓝图摄像机导演评估器类](#blueprint-camera-director-evaluator)
 
 #### 状态树摄像机导演 StateTree Camera Director
 
+与上文的蓝图摄像机导演相同，蓝图摄像机导演持有的是一个“类”，而状态树摄像机导演持有的是一个“资产”
+
+Director通过该资产（状态树）驱动摄像机的切换
+
+> 由于状态树在UE的不同领域也有用到，但不同领域的状态树需求不同，例如`StateTreeSchema`是为游戏中的AI行为设计的。所以创建状态树时需要使用CameraDirectorStateTreeSchema类，以支持ActivateCameraRig等操作），同时状态树内部的节点只能是摄像机领域相关的。
+> 
+> ![st](study_ue_gameplaycamera/state_tree.png)
+> 
+> 具体看[StateTree](#state-tree)
+
+### Camera Director Evaluator
+
+Evaluator中定义了该Director切换CameraRig的逻辑
+
+#### Blueprint Camera Director Evaluator
+
+工程中命名蓝图前缀一般为CDE
+
+> 实际上在工程中创建的蓝图仅仅只是个蓝图而已，真正的BlueprintCameraDirectorEvaluator是纯C++的，即在创建Evaluator时通过C++创建，Evaluator只是调用了蓝图的函数从而达到控制激活CameraRig的目的
+
+评估器中提供了一个事件和另外四个可重载函数，一般除了RunCameraDirector事件是需要重写的以外，其他的都不需要。
+
+**RunCameraDirector事件**
+
+该事件的调用与`Event Tick`类似，每一帧调用一次，主要用于决定该帧运行的CameraRig或子Context
+
+主要的三个函数：
+
+- `ActivateCameraRig(CameraRig)`直接激活一个Rig
+- `ActivateCameraRigProxy`：通过代理激活
+- `RunChildCameraDirector(DeltaTime, SlotName)`：把决策权委托给某个子Context
+
+当该事件没有被重载或没有连接到任意激活摄像机绑定的函数时，编译会警告你没有激活摄像机绑定
+
+**ActivateCameraDirector事件**
+
+该事件类似`BeginPlay`，当Context被推入摄像机系统栈时触发，一般用于初始化状态
+
+**DeactivateCameraDirection事件**
+
+类似`EndPlay`，当Context被弹出时触发
+
+**AddChildEvaluationContext(ChildContextOwner)函数**
+
+这时一个被动回调，当外部有子Context要附加进来时，通知当前Context，这样Context就能够获取到子Context的信息从而控制
+
+该函数的返回值FName即插入进来的Context的名称，可以使用这个FName传入RunChildCameraDirector调用
+
+此外，评估器还在继承Blueprint基本功能的基础上添加了大量函数
+
+### State Tree
+
+
+
 ### Camera Rig
 
-### 过渡 / 共享过渡
+#### 过渡
+
+### Camera Rig Proxy
+
+### Gameplay Camera Component
+
+即在蓝图中添加的Component
 
 ## 蓝图与源码的对应
 
 > 启用了该插件时，该插件的源码位置在我的电脑中的位置：
 > 
 > D:\UE_5.7\Engine\Plugins\Cameras\GameplayCameras\Source\GameplayCameras
+
+## 整体执行逻辑
+
+### 运行时实例化
+
+1. 从UGameplayCameraComponentBase继承而来的GameplayCameraComponent执行BeginPlay()
+2. UGameplayCameraComponentBase::BeginPlay()->如果启用“为玩家自动启用”则调用ActivateCameraForPlayerIndex(PlayerIndex)间接调用ActivateCameraForPlayerController，否则直接调用ForPlayerController创建，但不给任何Controller
+   > Context进入时其实进入的是ContextStack栈
+   > 
+   > GetActiveContext()方法永远返回栈顶，摄像机系统每帧只处理栈顶的Context
+   > 
+   > 这里的ActivationMode有三种模式，分别在ActivateCameraEvaluationContext()函数中switch三个不同的行为：
+   > 
+   > 1. Push：新Context成为栈顶，一般用于完全切换到另一个摄像机
+   > 2. PushAndInsert：旧的栈顶Context被设为新Context的子Context，新的Context成为栈顶，一般用于扩展摄像机功能
+   > 3. InsertOrPush：如果栈里有东西（即有ActiveContext），那么新Context成为旧Context的子Context，否则操作退化为Push
+3. ActivateCameraForPlayerController()->先Deactivate所有Context，然后获取PlayerControllerHost，调用ActivateCameraEvaluationContext()并传入对应PlayerController
+4. ActivateCameraEvaluationContext()->调用CreateCameraEvaluationContext(PlayerController)并应用ActivateMode行为
+5. CreateCameraEvaluationContext()->创建EvaluationContext并初始化所有属性
+6. 在ActivateCameraEvaluationContext调用时，会将Context Push到ContextStack中，并让Stack执行Context->Activate(ActivateParams)激活最新的Context
+7. FCameraEvaluationContext::Activate(ActivateParams)->调用AutoCreateDirectorEvaluator
+8. 在AutoCreateDirectorEvaluator函数中，获取到我们创建CameraAsset时选择的CameraDirector类，创建一个Builder并调用该类的BuildEvaluator(Builder)方法获得DirectorEvaluator并初始化。BuildEvaluator方法调用OnBuildEvaluator虚函数，这个虚函数在每个子类中各自实现
+   > **这里的Builder有什么用？**
+9. 执行DirectorEvaluator->Activate()，将自身的FCameraSystemEvaluator* Evaluator变量设为当前Context配置的Evaluator，并触发BlueprintCameraDirectorEvaluator的ActivateCameraDirector事件
+
+### 每帧更新
+
+1. FCameraSystemEvaluator执行Update()，从已激活的ActiveContext中取出DirectorEvaluator，调用UpdateCameraDirector()函数时传入该Evaluator
+2. UpdateCameraDirector()->执行Evaluator->Run()，Run()函数调用OnRun()虚函数，该虚函数在各个子类中实现
+   > 例如FBlueprintCameraDirectorEvaluator子类实现了调用BlueprintCameraDirectorEvaluator类的NativeRunCameraDirector函数，然后再调用RunCameraDirector事件，也就是打开蓝图看到的第一个事件节点
 
 ## 蓝图节点原理与实现
