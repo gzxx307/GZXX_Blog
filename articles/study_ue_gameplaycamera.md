@@ -86,6 +86,10 @@ Tags: UE, 经验, 知识
 ## 主要的类
 
 > 为了更好理解每个类的作用，可以搭配[整体执行逻辑](#整体执行逻辑)一起食用
+> 
+> 这一板块除了介绍有哪些常见的类，这些类在蓝图中怎么使用的，还会介绍相对底层的设计与逻辑。启用了该插件时，该插件的源码位置在我的电脑中的位置：
+> 
+> D:\UE_5.7\Engine\Plugins\Cameras\GameplayCameras\Source\GameplayCameras
 
 ### Camera Asset
 
@@ -146,8 +150,7 @@ UE目前为Director设计了四个不同的子类，每个子类都实现父类�
 
 ![pqcd](study_ue_gameplaycamera/priority_queue_camera_director.png)
 
-
-
+那么我们应该如何使用呢？在下面的[在C++中扩展](#在c中扩展)章节详写
 
 #### 单一摄像机导演 Single Camera Director
 
@@ -225,21 +228,42 @@ Evaluator中定义了该Director切换CameraRig的逻辑
 
 ### Camera Rig
 
+继承自UCameraRigAsset，蓝图一般前缀为CR
+
+CameraRig的执行和计算涉及到多个类的协同工作，这些类在下面详细讲，但其核心流程是当该Rig被激活时，调用该Rig的RootNode（摄像机节点根节点）的Evaluator，然后再对不同的层进行求值与合并，最终得到计算出的位置结果
+
+其核心属性有：
+
+- TObjectPtr<UCameraNode> RootNode：摄像机节点数的根节点
+- FGameplayTagContainer GameplayTags：用于匹配过渡条件的标签
+- TArray<TObjectPtr<UCameraRigTransition>> EnterTransitions：对应蓝图的过渡图表中的进入过渡列表
+- TArray<TObjectPtr<UCameraRigTransition>> ExitTransitions：对应蓝图的过渡图表中的退出过渡列表
+- ECameraRigInitialOrientation InitialOrientation：初始朝向策略
+
+#### 其中涉及到的一些类
+
+##### UCameraNode
+
+UCameraNode是摄像机节点树的基类，RootNode即为该类
+
+每个节点通过BuildEvaluator在运行时创建对应的Evaluator
+
+##### FCameraNodeEvaluator
+
+作为CameraNode在运行时创建的Evaluator，主要目的是为了将运行时状态与初始状态分离开，将数据层与执行层分离开
+
+主要在当前帧被调用时执行Run函数得到Result
+
 
 
 #### 过渡
 
-### Camera Rig Proxy
+#### Camera Rig Proxy
 
 ### Gameplay Camera Component
 
 即在蓝图中添加的Component
 
-## 蓝图与源码的对应
-
-> 启用了该插件时，该插件的源码位置在我的电脑中的位置：
-> 
-> D:\UE_5.7\Engine\Plugins\Cameras\GameplayCameras\Source\GameplayCameras
 
 ## 整体执行逻辑
 
@@ -272,3 +296,11 @@ Evaluator中定义了该Director切换CameraRig的逻辑
    > 例如FBlueprintCameraDirectorEvaluator子类实现了调用BlueprintCameraDirectorEvaluator类的NativeRunCameraDirector函数，然后再调用RunCameraDirector事件，也就是打开蓝图看到的第一个事件节点
 
 ## 蓝图节点原理与实现
+
+
+## 在C++中扩展
+
+
+## 一些问题与思考
+
+### 为什么设计Evaluator
