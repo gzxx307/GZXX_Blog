@@ -252,13 +252,33 @@ UCameraNode是摄像机节点树的基类，RootNode即为该类
 
 作为CameraNode在运行时创建的Evaluator，主要目的是为了将运行时状态与初始状态分离开，将数据层与执行层分离开
 
-主要在当前帧被调用时执行Run函数得到Result
+主要在当前帧被调用时执行Run函数得到Result，以供Camera更新自己的状态
+
+##### FBlendStackCameraNodeEvaluator
 
 
 
 #### 过渡
 
+UCameraRigTransition定义了Rig切换时的混合方式
+
 #### Camera Rig Proxy
+
+CameraRigProxy继承自UCameraRigProxyAsset，一般命名为CRP
+
+UCameraRigproxyAsset中只有Guid一个属性，而且该属性还没有暴露给蓝图，所以你打开该资产时会发现里面什么都没有，因为他就是什么都没有。
+
+之前说CameraAsset中的摄像机绑定表是一个键值对数组，Key为CameraRigProxy，value为CameraRig。Director能够指定CameraRig启用，也可以通过CameraRigProxy间接启用CameraRig，所以在CameraAsset的CameraRig表中，Proxy是可有可无的。
+
+如果Director试图启用某个没有被添加进Table的Proxy，程序通常会直接无视，即跳过运行
+
+**那为什么会设计这个东西？**
+
+UCameraRigProxyAsset本质上只是一个FGuid包装器，其作用是提供间接引用，目的是为了让代码能够更好的复用
+
+没有Proxy时，Director为了切换到正确的CameraRig需要我们手动硬编码，如果另外一套CameraAsset需要具有相同的切换逻辑只是启用的CameraRig不同，那么就需要额外写或者复制一套逻辑
+
+而当我们使用Proxy时，同一套逻辑可以指向不同的CameraRig，这样能够节省大量在蓝图中修改的时间，而且让错误能够更容易发现，只需要在CameraAsset里看Table配的对不对就行
 
 ### Gameplay Camera Component
 
@@ -304,3 +324,20 @@ UCameraNode是摄像机节点树的基类，RootNode即为该类
 ## 一些问题与思考
 
 ### 为什么设计Evaluator
+
+### UPROPERTY(Instanced)
+
+UPROPERTY的Instanced关键字是什么意思？为什么在这个插件的源码里到处都是？
+
+当一个属性拥有Instanced这个参数时，该属性会为拥有它的对象创建一个自己的专属新实例，可以理解为在父对象的构造函数中自动实例化了一个新的属性，而不是等程序手动分配对象或者手动创建
+
+与使用普通指针不同的是，该实例的生命周期跟随其父对象，即当父对象销毁时，该实例也会一并销毁
+
+当我们使用Instanced修饰一个属性时（一般是引用对象），代表每一个父对象都有一个专属的子对象，就像CameraAsset中每个Asset都有自己的Director和Transitions
+
+本质上，Instanced是为了让子对象被当作"值"类型，而非"引用"类型，类似成员变量的值对象与指针的区别
+
+> 通常，与UPROPERTY(Instanced)配套出现的还有UCLASS里的标记DefaultToInstanced和EditInlineNew
+> 
+> - DefaultToInstanced：当类本身标记了这个，类里的UPROPERTY即使不写Instanced也会默认instanced，但是一般还是显式写，因为不是每个属性都要Instanced，而且显式写更直观
+> - EditInlineNew：允许在编辑器的Details面板中直接通过"+"按钮新建该类的内嵌对象，例如上文提到的在CameraAsset的细节面板里创建BlueprintCameraDirectorEvaluator时点的"+"号
