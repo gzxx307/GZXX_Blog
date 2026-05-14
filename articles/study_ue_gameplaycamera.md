@@ -240,27 +240,42 @@ CameraRig的执行和计算涉及到多个类的协同工作，这些类在下�
 - TArray<TObjectPtr<UCameraRigTransition>> ExitTransitions：对应蓝图的过渡图表中的退出过渡列表
 - ECameraRigInitialOrientation InitialOrientation：初始朝向策略
 
-#### 其中涉及到的一些类
+#### NodeHierarchy面板
 
-##### UCameraNode
-
-UCameraNode是摄像机节点树的基类，RootNode即为该类
-
-每个节点通过BuildEvaluator在运行时创建对应的Evaluator
-
-##### FCameraNodeEvaluator
-
-作为CameraNode在运行时创建的Evaluator，主要目的是为了将运行时状态与初始状态分离开，将数据层与执行层分离开
-
-主要在当前帧被调用时执行Run函数得到Result，以供Camera更新自己的状态
-
-##### FBlendStackCameraNodeEvaluator
+定义CameraRig运动逻辑的节点树由一系列UCameraNode的子类构成，其根节点为RootNode
 
 
 
 #### 过渡
 
-UCameraRigTransition定义了Rig切换时的混合方式
+每个CameraRig都有属于自己的过渡列表，定义了该Rig在Enter或Exit时与其他Rig的混合行为，除此之外，CameraAsset中还有一个共享过渡
+
+由于可能存在多个过渡，例如前一个摄像机的Exit和后一个摄像机的Enter，而多个过渡无法融合到一起，所以过渡之间存在一个查找优先级：
+
+1. 旧Rig定义的Exit
+2. 旧Rig所属的CameraAsset的共享Exit
+3. 新Rig定义的Enter
+4. 新Rig所属的CameraAsset的共享Enter
+
+每次查找都会进行条件匹配，如果条件匹配成功则使用该过渡，如果没有则顺延到下一个过渡。如果四步都没找到则直接硬切
+
+##### UCameraRigTransition
+
+条件匹配定义在了UCameraRigTransition类中，这个类对应蓝图中的节点就是每次创建Enter或者Exit时必须添加的第一个节点
+
+有几个关键变量：
+
+- TArray<TObjectPtr<UCameraRigTransitionCondition>> Conditions：定义了该Transition的匹配条件
+- TObjectPtr<UBlendCameraNode> Blend：定义过渡方式
+- ECameraRigInitialOrientation InitialOrientation以及后面的一个bool变量：可选是否重载初始朝向
+
+其中UCameraRigTransitionCondition目前官方提供了两个节点：一个用于摄像机匹配，一个用于Gameplay标签匹配
+
+官方提供了部分继承自UBlendCameraNode的节点：
+
+
+
+如果需要自行扩充节点，看下面[在C++中扩展](#在c中扩展)
 
 #### Camera Rig Proxy
 
@@ -324,6 +339,18 @@ UCameraRigProxyAsset本质上只是一个FGuid包装器，其作用是提供间�
 ## 一些问题与思考
 
 ### 为什么设计Evaluator
+
+在该插件的源码中，你会发现Evaluator无处不在，每次要进行计算的时候都会有一个Evaluator
+
+可以将Evaluator理解为一个运行时状态以及运行方式
+
+一般的Evaluator是运行时生成的，激活时Evaluator都会被Build一次，然后再执行Run，即执行逻辑
+
+设计Evaluator有如下几点好处：
+
+1. 在一个多人游戏中，一个CameraRig资产可能被多个玩家使用，但是由于CameraRig只是一个资产，而将一个资产复制给每个玩家的开销和需求量较大，所以我们可以通过共享的方式提供给每个玩家。此时如果多个玩家同时操作CameraRig的数据，这肯定会导致问题。所以我们设计一个简单的独立状态容器，让Evaluator作为一个运行时状态在每个玩家处运行
+2. 在编辑器中修改CameraRig的节点树后，引擎可以保留BlendStack的结构而只重建被修改的Evaluator，这样其在BlendStack上的位置以及ID都不会变，热重载时很有效
+3. 通过Evaluator层，我们可以清晰的决定哪些数据是需要序列化的、哪些数据需要网络复制、哪些是计算中间值等等，使代码更加结构化
 
 ### UPROPERTY(Instanced)
 
