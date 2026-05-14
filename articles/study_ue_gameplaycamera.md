@@ -365,8 +365,6 @@ CameraRig的执行和计算涉及到多个类的协同工作，这些类在下�
 - PopBlendCameraNode：硬切（瞬移）
 - LocationRotationBlendCameraNode：位置和旋转分别混合，内嵌两个独立的SimpleBlend，可以为位移和旋转分配不同的曲线或时长
 - OrbitBlendCameraNode：轨道混合（摄像机沿弧形路径从旧位置绕到新位置）
-- ReverseBlendCameraNode：反向混合包装器（将任意Blend的BlendFactor取反，用于混合退出）
-- InterruptedBlendCameraNode：中断混合包装器（当混合进行中被新过渡打断时，从中断点无缝衔接）
 
 > 其继承关系为：UBlendCameraNode->USimpleBlendCameraNode(引入BlendFactor)->USimpleFixedTimeBlendCameraNode(引入固定时间计时)->LinearBlend/SmoothBlend
 > 
@@ -396,6 +394,22 @@ UCameraRigProxyAsset本质上只是一个FGuid包装器，其作用是提供间�
 
 即在蓝图中添加的Component
 
+GameplayCameraComponent是一个SenceComponent，其在Actor中的主要功能是持有CameraAsset引用、创建运行时EvaluationContext、把求值结果输出给引擎的摄像机系统
+
+与GameplayCameraComponent并列的还有一个GameplayCameraRigComponent，与GameplayCameraComponent不同的是，其持有的引用为单个CameraRig而非一个CameraAsset
+
+插件还提供了一个Actor类AGameplayCameraActor，这是一个简单的Actor包装器，内部有一个UGameplayCameraComponent，并在Actor成为目标时自动启用摄像机，这样就能在世界中放置一个单独的摄像机了
+
+其有以下核心属性：
+
+- FCameraAssetReference CameraReference（GameplayCameraComponent）：引用要运行的CameraAsset（FCameraAssetReference是一个包装器结构体，里面有CameraAsset和Params）
+- FCameraRigAssetReference CameraRigReference（GameplayCameraRigComponnet）：引用CameraRig
+- TEnumAsByte<EAutoReceiveInput::Type> AutoActivateForPlayer：是否在BeginPlay时自动为指定玩家激活，每一个玩家下标为一个枚举值
+- bool bSetControlRotationWhenViewTarget：是否将计算结果回写至PlayerController的ControlRotation
+- bool bRunInEditor：编辑器中是否也运行摄像机（用于预览的小窗）
+- int32 EditorPreviewCameraRigIndex：编辑器中预览的Rig索引
+
+其中，GameplayCamera还为蓝图提供了大量节点，这里不再说明
 
 ## 整体执行逻辑
 
