@@ -244,7 +244,91 @@ CameraRig的执行和计算涉及到多个类的协同工作，这些类在下�
 
 定义CameraRig运动逻辑的节点树由一系列UCameraNode的子类构成，其根节点为RootNode
 
+可以理解为每个节点都是一个函数，一个RootNode通过调用以下的多个函数定义每一帧的摄像机的行为
 
+所有官方提供的节点：
+
+**变换**
+
+- SetLocationCameraNode：直接设置摄像机世界位置
+- SetRotationCameraNode：直接设置摄像机世界旋转
+- OffsetCameraNode：在当前摄像机位置上叠加偏移（包括位移和旋转），可以选择偏移空间
+- BoomArmCameraNode：摇臂节点；设置一个相对其父对象位置的偏移作为旋转中心，摄像机向旋转中心后方延伸一段距离并面向一点（类似官方的第三人称模式里自带的第三人称摇臂），可以接收2D输入
+- DampenPositionCameraNode：位移阻尼/平滑，可以对前后、左右、上下三个方向分别做低通滤波，0为默认无滤波，数值越大平滑越不明显
+- DampenRotationCameraNode：旋转阻尼/平滑，类似上面的节点，对Yaw、Pitch、Roll三个旋转轴分别做低通滤波
+
+**镜头与机身**
+
+- FieldOfViewCameraNode：设置FOV
+- LensParametersCameraNode：镜头参数（包括焦距、对焦距离、光圈）
+- FilmbackCameraNode：传感器/胶片参数（传感器宽度、高度、偏移、过扫描、宽高比约束）
+- BodyParametersCameraNode：机身参数（快门速度和ISO感光度）
+- OrthographicCameraNode：设置为正交投影，并设置正交宽度
+- ClippingPlanesCameraNode：设置进/远裁剪平面距离
+
+**渲染与对焦**
+
+- PostProcessCameraNode：叠加后处理
+- AutoFocusCameraNode：自动对焦，将对焦距离自动设为当前目标距离，并且可以设置阻尼/平滑
+
+**逻辑控制**
+
+- Sequence：序列节点，和蓝图一样依次执行
+- CameraRigPrefab：嵌入运行另一个CameraRig资产
+- TargetRayCastCameraNode：射线目标节点，从摄像机位置发射射线确定目标
+
+**样条线**
+
+- SplineOffsetCameraNode：沿样条线偏移摄像机位置
+- SplineOrbitCameraNode：沿样条线轨道运动
+- SplineFieldOfViewCameraNode：沿样条线改变FOV
+
+**构图**
+
+构图节点可以根据屏幕空间中目标的位置自动调整摄像机，使目标保持在画面中的理想位置上
+
+- BaseFramingCameraNode：构图基类，定义目标Actor、理想构图位置、DeadZone、SoftZone与阻尼参数，子类只需要重载"如何移动或旋转来重新框住目标"就行
+- DollyFramingCameraNode：推拉构图，通过左右或上下平移来重新框住目标
+- PanningFramingCameraNode：摇镜构图，通过原地旋转来重新框住目标
+
+**输入**
+
+- Input2DCameraNode：2D输入抽象基类
+- InputAxisBinding2DCameraNode：从InputAction读取轴输入，可以设置为累积模式或非累积模式，
+- InputAccumulator2DCameraNode：将输入值逐帧累加
+- RawInputAxisBinding2DCameraNode：从InputAction读取原始轴值，不含累积
+- DrivenControlRotationCameraNode：输入跟随ControlRotation，在混合退出时解除，并对最后已知朝向施加增量旋转
+- AutoRotateInput2DCameraNode：设置摄像机的自动回正，在一段时间无操作后将摄像机自动旋转回默认朝向
+
+**附着**
+
+将摄像机附着到Actor或Pawn
+
+- AttachToActorCameraNode：附着到指定Actor，可跟随位置或旋转
+- AttachToPlayerPawnCameraNode：附着到玩家Pawn，可跟随位置或旋转，支持Socket或Bone
+- AttachToActorGroupCameraNode：附着到一组Actor的中心
+
+**抖动**
+
+模拟摄像机的震动效果
+
+- CameraShakeCameraNode：嵌入运行一个CameraShake资产
+- ShakeCameraNode：抖动节点基类
+- PerlinNoiseLocationShakeCameraNode：柏林噪声位置抖动
+- PerlinNoiseRotationShakeCameraNode：柏林噪声旋转抖动
+- CompositeShakeCameraNode：组合抖动，将多个抖动子节点组合执行
+- EnvelopeShakeCameraNode：通过包络控制抖动，有进入、持续、释放三个阶段
+
+**碰撞**
+
+处理摄像机与场景几何体的交互：
+
+- CollisionPushCameraNode：碰撞推离，当摄像机与场景碰撞时推向安全位置，默认为Pivot或Pawn位置，带Push/Pull插值器，如果为异步碰撞检测则可以不阻塞主线程从而提升性能
+- OcclusionMaterialCameraNode：遮挡透明，当Actor遮挡摄像机视线时对其应用透明材质
+
+**工具**
+
+- BlueprintCameraNode：蓝图自定义节点，在BluePrint中编写CameraNode逻辑，可以定义自定义行为
 
 #### 过渡
 
@@ -273,7 +357,20 @@ CameraRig的执行和计算涉及到多个类的协同工作，这些类在下�
 
 官方提供了部分继承自UBlendCameraNode的节点：
 
+- LinearBlendCameraNode：线性混合，固定时间内BlendFactor从0均匀变化到1，结果通过插值计算
+- SmoothBlendCameraNode：平滑混合，基于SmoothStep或SmootherStep曲线，开头结尾缓入缓出
+  > SmoothStep：
+  > 
+  > SmootherStep：
+- PopBlendCameraNode：硬切（瞬移）
+- LocationRotationBlendCameraNode：位置和旋转分别混合，内嵌两个独立的SimpleBlend，可以为位移和旋转分配不同的曲线或时长
+- OrbitBlendCameraNode：轨道混合（摄像机沿弧形路径从旧位置绕到新位置）
+- ReverseBlendCameraNode：反向混合包装器（将任意Blend的BlendFactor取反，用于混合退出）
+- InterruptedBlendCameraNode：中断混合包装器（当混合进行中被新过渡打断时，从中断点无缝衔接）
 
+> 其继承关系为：UBlendCameraNode->USimpleBlendCameraNode(引入BlendFactor)->USimpleFixedTimeBlendCameraNode(引入固定时间计时)->LinearBlend/SmoothBlend
+> 
+> LinearBlend和SmoothBlend的核心区别仅有OnComputeBlendFactor的返回值曲线不同
 
 如果需要自行扩充节点，看下面[在C++中扩展](#在c中扩展)
 
