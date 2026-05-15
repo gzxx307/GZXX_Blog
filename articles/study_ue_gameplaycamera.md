@@ -359,9 +359,9 @@ CameraRig的执行和计算涉及到多个类的协同工作，这些类在下�
 
 - LinearBlendCameraNode：线性混合，固定时间内BlendFactor从0均匀变化到1，结果通过插值计算
 - SmoothBlendCameraNode：平滑混合，基于SmoothStep或SmootherStep曲线，开头结尾缓入缓出
-  > SmoothStep：
+  > SmoothStep：3t<sup>2</sup> - 2t<sup>3</sup>
   > 
-  > SmootherStep：
+  > SmootherStep：6t<sup>5</sup> - 15t<sup>4</sup> + 10t<sup>3</sup>
 - PopBlendCameraNode：硬切（瞬移）
 - LocationRotationBlendCameraNode：位置和旋转分别混合，内嵌两个独立的SimpleBlend，可以为位移和旋转分配不同的曲线或时长
 - OrbitBlendCameraNode：轨道混合（摄像机沿弧形路径从旧位置绕到新位置）
@@ -443,9 +443,236 @@ GameplayCameraComponent是一个SenceComponent，其在Actor中的主要功能�
 
 ## 蓝图节点原理与实现
 
+### NodeHierarchy面板节点图（以BoomArmCameraNode为例）
+
+首先，和Evaluator模式一致，每个节点都是两个类共同作用的结果
+
+- UBoomArmCameraNode：存储编辑器中配置的属性
+- FBoomArmCameraNodeEvaluator：每帧执行实际的摇臂计算，存储的是运行时状态
+
+UBoomArmCameraNode的构造函数只有一行，它标记了自己有自定义节点，引擎不会从UPROPERTY反射来发现子节点，而是通过调用OnGetChildren()来显示申明
+
+```cpp
+UBoomArmCameraNode::UBoomArmCameraNode(const FObjectInitializer& ObjInit)
+	: Super(ObjInit)
+{
+	AddNodeFlags(ECameraNodeFlags::CustomGetChildren);
+}
+
+FCameraNodeChildrenView UBoomArmCameraNode::OnGetChildren()
+{
+	return FCameraNodeChildrenView({ InputSlot });
+}
+```
+
+InputSlot被标记为输入引脚，在编辑器中，你可以把任意Input2DCameraNode子类（比如InputAxisBinding2DCameraNode）连接到这个引脚上
+
+```cpp
+UPROPERTY(meta=(ObjectTreeGraphPinDirection=Input))
+TObjectPtr<UInput2DCameraNode> InputSlot;
+```
+
+当数据类需要创建对应的Evaluator时，会调用OnBuildEvaluator()函数
+
+```cpp
+FCameraNodeEvaluatorPtr UBoomArmCameraNode::OnBuildEvaluator(FCameraNodeEvaluatorBuilder& Builder) const
+{
+	using namespace UE::Cameras;
+	return Builder.BuildEvaluator<FBoomArmCameraNodeEvaluator>();
+}
+```
+
+每个子类都需要重写这个函数，告诉系统该数据类由哪个Evaluator类管理，Builder会创建Evaluator实例并自动建立树形关系
+
+当Rig被激活，推入BlendStack中时，Evaluator调用OnBuild()函数，递归地把整颗节点树的所有Evaluator都构建出来
+
+```cpp
+void FBoomArmCameraNodeEvaluator::OnBuild(const FCameraNodeEvaluatorBuildParams& Params)
+{
+	const UBoomArmCameraNode* BoomArmNode = GetCameraNodeAs<UBoomArmCameraNode>();
+	InputSlotEvaluator = Params.BuildEvaluatorAs<FInput2DCameraNodeEvaluator>(BoomArmNode->InputSlot);
+	if (BoomArmNode->BoomLengthInterpolator)
+	{
+		BoomLengthInterpolator = BoomArmNode->BoomLengthInterpolator->BuildDoubleInterpolator();
+	}
+}
+```
+
+第一帧初始化时，调用OnInitialize()函数
+
+```cpp
+void FBoomArmCameraNodeEvaluator::OnInitialize(const FCameraNodeEvaluatorInitializeParams& Params, FCameraNodeEvaluationResult& OutResult)
+{
+	SetNodeEvaluatorFlags(ECameraNodeEvaluatorFlags::SupportsOperations);
+	// 初始化参数读取器，将编辑后的UPROPERTY引用初始化到变量表
+	const UBoomArmCameraNode* BoomArmNode = GetCameraNodeAs<UBoomArmCameraNode>();
+	BoomOffsetReader.Initialize(BoomArmNode->BoomOffset);
+	MaxForwardInterpolationFactorReader.Initialize(BoomArmNode->MaxForwardInterpolationFactor);
+	MaxBackwardInterpolationFactorReader.Initialize(BoomArmNode->MaxBackwardInterpolationFactor);
+	// 初始化运行时状态
+	LastPivotLocation = FVector3d::ZeroVector;
+	CumulativePull = 0.0;
+}
+```
+
+这里设置了SupportsOperations标志，告诉系统这个节点可以响应外部的操作请求（例如IK系统可以修正朝向）
+
+之后每帧执行OnRun()，是核心逻辑
+
+```cpp
+void FBoomArmCameraNodeEvaluator::OnRun(const FCameraNodeEvaluationParams& Params, FCameraNodeEvaluationResult& OutResult)
+{
+	// 创建一个新值并初始化
+	FRotator3d BoomRotation = FRotator3d::ZeroRotator;
+	// 如果有子节点InputSlot的Evaluator
+	if (InputSlotEvaluator)
+	{
+		// 先运行子节点，获取输入值
+		InputSlotEvaluator->Run(Params, OutResult);
+		// Evaluator理念，输入值从函数获取而非Run的返回值
+		const FVector2d YawPitch = InputSlotEvaluator->GetInputValue();
+		// 更新
+		BoomRotation = FRotator3d(YawPitch.Y, YawPitch.X, 0);
+	}
+	// 否则获取到PlayerController
+	else if (APlayerController* PlayerController = GetPlayerController(Params.EvaluationContext))
+	{
+		// 从Controller里获取到旋转值
+		const FRotator3d ControlRotation = PlayerController->GetControlRotation();
+		BoomRotation = ControlRotation;
+	}
+
+	const UBoomArmCameraNode* BoomArmNode = GetCameraNodeAs<UBoomArmCameraNode>();
+
+	// FinalTransform = BoomOffset * BoomRotation * CameraPose.Location
+	const FTransform3d BoomPivot(BoomRotation, OutResult.CameraPose.GetLocation());
+	const FVector3d BoomOffset(BoomOffsetReader.Get(OutResult.VariableTable));
+	// 计算变换
+	FTransform3d FinalTransform(FTransform3d(BoomOffset) * BoomPivot);
+	//OutResult.CameraPose.GetLocation()是上游节点传入的摄像机位置
+
+	// 默认摇臂长度
+	const double DefaultBoomLength = BoomOffset.Length();
+
+	if (BoomLengthInterpolator && DefaultBoomLength > 0)
+	{
+		if (!Params.bIsFirstFrame && !OutResult.bIsCameraCut)
+		{
+			// 计算本帧Pivot沿视线方向的位移
+			// 锚点偏移量
+			const FVector3d PivotMovement = BoomPivot.GetLocation() - LastPivotLocation;
+			// 前向向量
+			const FVector3d ForwardBoomOrientation = BoomRotation.RotateVector(FVector3d::ForwardVector);
+			// 点乘，得出位移
+			const double PullThisFrame = PivotMovement.Dot(ForwardBoomOrientation);
+			CumulativePull += PullThisFrame;
+
+			// 更新插值器，让其值向零点靠近
+			BoomLengthInterpolator->Reset(CumulativePull, 0);
+			FCameraValueInterpolationParams InterpParams;
+			InterpParams.DeltaTime = Params.DeltaTime;
+			FCameraValueInterpolationResult InterpResult(OutResult.VariableTable);
+			// 插值器运行
+			double NewCumulativePull = BoomLengthInterpolator->Run(InterpParams, InterpResult);
+
+			// 限制前后方向的最大伸缩量
+			double ClampedPull = NewCumulativePull;
+			if (ClampedPull < 0)
+			{
+				const double MaxForwardInterpolationFactor = MaxForwardInterpolationFactorReader.Get(OutResult.VariableTable);
+				if (MaxForwardInterpolationFactor > 0)
+				{
+					const double MaxForwardPush = DefaultBoomLength * MaxForwardInterpolationFactor;
+					ClampedPull = FMath::Max(-MaxForwardPush, ClampedPull);
+				}
+			}
+			else if (ClampedPull > 0)
+			{
+				const double MaxBackwardInterpolationFactor = MaxBackwardInterpolationFactorReader.Get(OutResult.VariableTable);
+				if (MaxBackwardInterpolationFactor > 0)
+				{
+					const double MaxBackwardPull = DefaultBoomLength * MaxBackwardInterpolationFactor;
+					ClampedPull = FMath::Min(MaxBackwardPull, ClampedPull);
+				}
+			}
+
+			// 沿视线方向偏移摄像机位置
+			FinalTransform.SetLocation(FinalTransform.GetLocation() - ForwardBoomOrientation * ClampedPull);
+
+			CumulativePull = ClampedPull;
+		}
+		else if (!Params.bIsFirstFrame && OutResult.bIsCameraCut)
+		{
+			// On camera cuts, we re-use last frame's cumulative pull without updating it.
+			const FVector3d ForwardBoomOrientation = BoomRotation.RotateVector(FVector3d::ForwardVector);
+			FinalTransform.SetLocation(FinalTransform.GetLocation() - ForwardBoomOrientation * CumulativePull);
+
+			// Leave bDebugDidClampPull to what it was last frame.
+		}
+		else if (Params.bIsFirstFrame)
+		{
+			CumulativePull = 0.0;
+		}
+
+		LastPivotLocation = BoomPivot.GetLocation();
+	}
+
+	OutResult.CameraPose.SetTransform(FinalTransform);
+	
+	OutResult.CameraRigJoints.AddYawPitchJoint(BoomPivot);
+}
+```
+
+UCameraValueInterpolator也是一个数据与运行时分离的设计，运行时其持有插值状态并在每帧更新
+
+当外部需要对其进行操作时，例如IK系统希望瞄准一个物体时，IK会生成一个FYawPitchCameraOperation来修正摄像机的朝向
+
+```cpp
+void FBoomArmCameraNodeEvaluator::OnExecuteOperation(const FCameraOperationParams& Params, FCameraOperation& Operation)
+{
+	// 这里只处理没有输入节点时的情况
+	if (!InputSlotEvaluator)
+	{
+		if (FYawPitchCameraOperation* Op = Operation.CastOperation<FYawPitchCameraOperation>())
+		{
+			if (APlayerController* PlayerController = GetPlayerController(Params.EvaluationContext))
+			{
+				// 将Operation产生的旋转应用至PlayerController
+				FRotator3d ControlRotation = PlayerController->GetControlRotation();
+				ControlRotation.Yaw = Op->Yaw.Apply(ControlRotation.Yaw);
+				ControlRotation.Pitch = Op->Pitch.Apply(ControlRotation.Pitch);
+				PlayerController->SetControlRotation(ControlRotation);
+			}
+		}
+	}
+}
+```
+
+这里只需要考虑没有InputSlot的情况，因为上层的FCameraNodeEvaluatorHierarchy::CallExecuteOperation会遍历整颗Evaluator树，对所有标记了SupportsOperations的Evaluator各调用一次ExecuteOperation，可视为一次广播
+
+当存在InputSlot时，我们需要保证对Operation做出反应的Evaluator只有InputSlot，所以不对存在InputSlot时的情况进行处理
+
+### 过渡节点图（以SmoothStep为例）
 
 ## 在C++中扩展
 
+### CameraNode
+
+如果要写一个自己的CameraNode，可以概括为以下几步：
+
+1. 创建数据类：继承UCameraNode，定义UPROPERTY配置项，重写OnGetChildren、OnBuildEvaluator
+2. 创建Evaluator类：继承TCameraNodeEvaluator<数据类>或FCameraNodeEvaluator，在类内开头添加使用UE_DECLARE_CAMERA_NODE_EVALUATOR宏，例如
+   ```cpp
+   class FBoomArmCameraNodeEvaluator : public FCameraNodeEvaluator
+   {
+		UE_DECLARE_CAMERA_NODE_EVALUATOR(GAMEPLAYCAMERAS_API, FBoomArmCameraNodeEvaluator)
+
+		// ...
+   }
+   ```
+3. 实现OnBuild：用Params.BuildEvaluatorAs<T>(Node->ChildSlot)构建所有下一级子Evaluator
+4. 实现OnInitialize：初始化TCameraParameterReader，并用SetNodeEvaluatorFlags设置标签
+5. 实现OnRun：编写核心逻辑，将输出写入OutResult.CameraPose与OutResult.CameraRigJoints（如果像上文一样有其他系统的操作需求）
 
 ## 一些问题与思考
 
@@ -462,6 +689,19 @@ GameplayCameraComponent是一个SenceComponent，其在Actor中的主要功能�
 1. 在一个多人游戏中，一个CameraRig资产可能被多个玩家使用，但是由于CameraRig只是一个资产，而将一个资产复制给每个玩家的开销和需求量较大，所以我们可以通过共享的方式提供给每个玩家。此时如果多个玩家同时操作CameraRig的数据，这肯定会导致问题。所以我们设计一个简单的独立状态容器，让Evaluator作为一个运行时状态在每个玩家处运行
 2. 在编辑器中修改CameraRig的节点树后，引擎可以保留BlendStack的结构而只重建被修改的Evaluator，这样其在BlendStack上的位置以及ID都不会变，热重载时很有效
 3. 通过Evaluator层，我们可以清晰的决定哪些数据是需要序列化的、哪些数据需要网络复制、哪些是计算中间值等等，使代码更加结构化
+
+### 为什么这里有大量类不继承UObject参与自动的内存管理，而是普通C++类
+
+在UE命名规范中，U前缀代表UObject及其子类，F前缀代表普通的C++类型比如普通C++的class和struct。该插件中的大量类不继承UObject，而是使用普通C++类，所以会看到大量的F前缀
+
+为什么不用普通C++类？
+
+1. 由于同一个UCameraRigAsset可能同时被多个玩家使用，每个玩家都需要一份独立的运行时状态。如果运行时状态也用UObject，每个玩家激活一个Rig就要走一次GC分配，这会导致频繁切换摄像机时的GC分配和追踪开销会非常可观。用普通C++类则可以轻松批量分配和回收，甚至使用Arena Allocator整块申请和释放。
+2. 当编辑器修改CameraRig的节点树后，系统需要尽可能保留已有的多摄像机混合的结构，这样过渡就不会被重构一次或者打断。如果Evaluator是UObject，它的生命周期被GC控制，而普通C++类的Evaluator可以直接自定义管理机制
+
+UCameraNode用UObject是因为它需要编辑器配置、蓝图继承、资产引用等等引擎提供的特性，而FCameraNodeEvaluator不用UObject是因为它需要轻量、高频创建销毁以及精确的控制内存
+
+所以GC有的时候太重了
 
 ### UPROPERTY(Instanced)
 
