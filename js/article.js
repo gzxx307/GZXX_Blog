@@ -71,6 +71,10 @@ function _renderArticleContent(article) {
     document.getElementById('toc-tags').innerHTML = tagsHtml;
     // 将 Markdown 内容解析为 HTML 并写入详情页容器
     document.getElementById('article-content').innerHTML = marked.parse(article.content);
+    // 对所有代码块应用 highlight.js 语法高亮
+    document.querySelectorAll('#article-content pre code').forEach(block => {
+        hljs.highlightElement(block);
+    });
     // 内容写入后立即初始化目录与灯箱
     initToc();
     initLightbox();
