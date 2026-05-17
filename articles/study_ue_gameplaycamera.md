@@ -652,7 +652,170 @@ void FBoomArmCameraNodeEvaluator::OnExecuteOperation(const FCameraOperationParam
 
 当存在InputSlot时，我们需要保证对Operation做出反应的Evaluator只有InputSlot，所以不对存在InputSlot时的情况进行处理
 
-### 过渡节点图（以SmoothStep为例）
+### 过渡节点图（以SmoothBlend为例）
+
+与BoomArm不同，过渡（Blend混合）节点虽然也是CameraNode，但是他的作用是在BlendStack的两个Entry之间做过渡，而不是直接产出摄像机的位置和旋转
+
+继承链如下所示，上一个类为下一个类的父类，数据层与运行时层的Evaluator一一对应
+
+**数据层：**
+
+- UCameraNode：节点基类
+- UBlendCameraNode：空标记类，表示该节点为混合节点
+- USimpleBlendCameraNode：空标记类，表示该节点使用标量BlendFactor
+- USimpleFixedTimeBlendCameraNode：引入BlendTime
+- USmoothBlendCameraNode：引入BlendType（即SmoothStep和SmootherStep），该类本身就只有这一个新属性
+
+**运行时层：**
+
+- FCameraNodeEvaluator：节点运行时基类
+- FBlendCameraNodeEvaluator：新增BlendParameters()、BlendResults()、Freeze()
+- FSimpleBlendCameraNodeEvaluator：新增BlendFactor和OnComputeBlendFactor()
+- FSimpleFixedTimeBlendCameraNodeEvaluator：新增计时器（TotalTime/CurrentTime）
+- FSmoothBlendCameraNodeEvaluator：重写OnComputeBlendFactor()
+
+在每个Blend节点中，执行三个函数：
+
+1. OnRun，每帧时执行，用于更新混合进度（BlendFactor从0到1）
+2. OnBlendParameters，在每帧的子Entry节点树运行之前，把子Entry的变量表按BendFactor进度混合到当前变量表
+3. OnBlendResults，在每帧的子Entry节点树运行之后，把子Entry的求值结果按BlendFactor混合到当前结果
+
+主要介绍Evaluator的实现：
+
+FBlendCameraNodeEvaluator类提供三个虚函数和对应的公开入口：
+
+```cpp
+/**
+ * Base evaluator class for blend camera nodes.
+ */
+class FBlendCameraNodeEvaluator : public FCameraNodeEvaluator
+{
+	UE_DECLARE_CAMERA_NODE_EVALUATOR(GAMEPLAYCAMERAS_API, FBlendCameraNodeEvaluator)
+public:
+	GAMEPLAYCAMERAS_API void BlendParameters(const FCameraNodePreBlendParams& Params, FCameraNodePreBlendResult& OutResult);
+	GAMEPLAYCAMERAS_API void BlendResults(const FCameraNodeBlendParams& Params, FCameraNodeBlendResult& OutResult);
+	bool InitializeFromInterruption(const FCameraNodeBlendInterruptionParams& Params);
+	bool SetReversed(bool bInReverse);
+	void Freeze();
+protected:
+	virtual void OnBlendParameters(const FCameraNodePreBlendParams& Params, FCameraNodePreBlendResult& OutResult) {}
+	virtual void OnBlendResults(const FCameraNodeBlendParams& Params, FCameraNodeBlendResult& OutResult) {}
+	virtual bool OnInitializeFromInterruption(const FCameraNodeBlendInterruptionParams& Params) { return false; }
+	virtual bool OnSetReversed(bool bInReverse) { return false; }
+	virtual void OnFreeze() {}
+};
+```
+
+FSimpleBlendCameraNodeEvaluator则实现了OnBlendParameters和OnBlendResults的具体逻辑
+
+```cpp
+void FSimpleBlendCameraNodeEvaluator::OnRun(const FCameraNodeEvaluationParams& Params, FCameraNodeEvaluationResult& OutResult)
+{
+	FSimpleBlendCameraNodeEvaluationResult FactorResult;
+	OnComputeBlendFactor(Params, FactorResult);
+	BlendFactor = FMath::Clamp(FactorResult.BlendFactor, 0.f, 1.f);
+	if (bReverse)
+	{
+		BlendFactor = 1.f - BlendFactor;
+	}
+}
+
+void FSimpleBlendCameraNodeEvaluator::OnBlendParameters(const FCameraNodePreBlendParams& Params, FCameraNodePreBlendResult& OutResult)
+{
+	const FCameraVariableTable& ChildVariableTable(Params.ChildVariableTable);
+	OutResult.VariableTable.Lerp(ChildVariableTable, Params.VariableTableFilter, BlendFactor);
+
+	OutResult.bIsBlendFull = (bReverse ? BlendFactor <= 0.f : BlendFactor >= 1.f);
+	OutResult.bIsBlendFinished = bIsBlendFinished;
+}
+
+void FSimpleBlendCameraNodeEvaluator::OnBlendResults(const FCameraNodeBlendParams& Params, FCameraNodeBlendResult& OutResult)
+{
+	const FCameraNodeEvaluationResult& ChildResult(Params.ChildResult);
+	FCameraNodeEvaluationResult& BlendedResult(OutResult.BlendedResult);
+
+	BlendedResult.LerpAll(ChildResult, BlendFactor);
+
+	OutResult.bIsBlendFull = (bReverse ? BlendFactor <= 0.f : BlendFactor >= 1.f);
+	OutResult.bIsBlendFinished = bIsBlendFinished;
+}
+```
+
+其中OnRun是模板方法，它调用OnComputeBlendFactor()获取原始值（该方法在子类中重写），然后Clamp到0-1，再处理反向
+
+OnBlendParameters()用BlendFactor对变量表做线性插值，OnBlendResults对求值结果做线性插值。函数后面的bool变量用于标记该Entry是否完成Blend，告诉BlendStack什么时候进行回收
+
+FSimpleFixedTimeBlendCameraNodeEvaluator引入计时器TotalTime和CurrentTime，是大多数混合节点的父类
+
+```cpp
+void FSimpleFixedTimeBlendCameraNodeEvaluator::OnInitialize(const FCameraNodeEvaluatorInitializeParams& Params, FCameraNodeEvaluationResult& OutResult)
+{
+	Super::OnInitialize(Params, OutResult);
+
+	const USimpleFixedTimeBlendCameraNode* BlendNode = GetCameraNodeAs<USimpleFixedTimeBlendCameraNode>();
+	BlendTimeReader.Initialize(BlendNode->BlendTime);
+	TotalTime = BlendTimeReader.Get(OutResult.VariableTable);
+}
+
+void FSimpleFixedTimeBlendCameraNodeEvaluator::OnRun(const FCameraNodeEvaluationParams& Params, FCameraNodeEvaluationResult& OutResult)
+{
+	CurrentTime += Params.DeltaTime;
+	if (CurrentTime >= TotalTime)
+	{
+		CurrentTime = TotalTime;
+		SetBlendFinished();
+	}
+
+	FSimpleBlendCameraNodeEvaluator::OnRun(Params, OutResult);
+}
+
+float FSimpleFixedTimeBlendCameraNodeEvaluator::GetTimeFactor() const
+{
+	if (TotalTime > 0.f)
+	{
+		return CurrentTime / TotalTime;
+	}
+	return 1.f;
+}
+```
+
+这三个函数包含初始化计时器，更新计时器以及获取当前CurrentTime/TotalTime的功能
+
+CurrentTime/TotalTime即原始的t，但不直接作为BlendFactor。这个t被传给子类的OnComputeBlendFactor，由子类决定如何从t映射到BlendFactor
+
+FSmoothBlendCameraNodeEvaluator的唯一代码就是定义了t映射到BlendFactor的方式
+
+```cpp
+void FSmoothBlendCameraNodeEvaluator::OnComputeBlendFactor(const FCameraNodeEvaluationParams& Params, FSimpleBlendCameraNodeEvaluationResult& OutResult)
+{
+	using namespace UE::Cameras;
+
+	const USmoothBlendCameraNode* BlendNode = GetCameraNodeAs<USmoothBlendCameraNode>();
+	const float t = GetTimeFactor();
+	switch (BlendNode->BlendType)
+	{
+		case ESmoothCameraBlendType::SmoothStep:
+			OutResult.BlendFactor = SmoothStep(t);
+			break;
+		case ESmoothCameraBlendType::SmootherStep:
+			OutResult.BlendFactor = SmootherStep(t);
+			break;
+		default:
+			OutResult.BlendFactor = 1.f;
+			break;
+	}
+}
+```
+
+t代表线性时间，而BlendFactor应该不是随着t而线性过渡的，而是将时间映射到进度的曲线
+
+LinearBlend（线性过渡）的OnComputeBlendFactor就是简单的BlendFactor=t，而BPPopBlend（硬切）就是OnComputeBlendFactor直接返回1.0f
+
+那么InterruptedBlend和ReverseBlend又是什么东西？
+
+当Blend被用于Exit过渡时，BlendFactor需要从1-0反向，如果一个Blend子类自己不支持反向（即OnSetReversed返回false），那么系统会自动用ReverseBlendCameraNode包装他
+
+假设一次混合进行到70%时被一个新的Rig激活，系统需要从中断点无缝衔接，SmoothBlend从FSimpleFixedTimeBlendCameraNodeEvaluator继承了中断处理，将新Blend的TotalTime缩短为原来的70%，并从0开始计时。如果不支持，系统会用InterruptedBlendCameraNode包装它
 
 ## 在C++中扩展
 
