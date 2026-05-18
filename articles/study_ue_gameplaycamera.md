@@ -390,6 +390,78 @@ UCameraRigProxyAsset本质上只是一个FGuid包装器，其作用是提供间�
 
 而当我们使用Proxy时，同一套逻辑可以指向不同的CameraRig，这样能够节省大量在蓝图中修改的时间，而且让错误能够更容易发现，只需要在CameraAsset里看Table配的对不对就行
 
+### BlendStack
+
+CameraRig类涉及到一个重要的模块称为BlendStack，它不是一种类，而是一个体系，并且涉及到大量的类
+
+BlendStack顾名思义称作混合栈，它通过拥有多个CameraRig的Entry，当这些CameraRig在一个时刻同时运行时（一般是在过渡的时候），BlendStack控制每个Rig什么时候运行、怎么混合、什么时候被移除
+
+其数据层的类为UBlendStackCameraNode，该类在每个CameraRig的节点树的RootNode下都存在
+
+ECameraBlendStackType枚举区分了BlendStack的两种模式：
+
+1. IsolatedTransient：栈里的每个Rig独立求值，求值后按BlendFactor（可以理解为混合进度）把结果混合到一起，当最上层的Blend达到100%时，下面的所有Rig自动弹出，一般用于做摄像机模式切换
+2. AdditivePersistent：栈里的Rig累加求值，即下层的Rig的求值结果会成为上层Rig的输入，且Rig不会自动移除，必须手动Remove，每个Entry会有一个StackOrder决定它在栈中的顺序，值越大越靠上，一般用于层叠摄像机修改器（比如位移+后处理+特效等）
+
+UBlendStackCameraNode对应的运行时层为FBlendStackCameraNodeEvaluator，其包含所有的共用逻辑（Entry管理、序列化、冻结、事件广播等），BlendStack两种模式对应的两种子类只实现不同的更新算法
+
+Evaluator中定义了结构体FCameraRigEntry，运行时每个CameraRig以CameraRigEntry的形式存在于BlendStack中
+
+#### TransientBlendStack详解
+
+切换CameraRig时，BlendStack将CameraRig推入栈顶：
+
+1. 如果新Rig和栈顶Rig相同，直接返回空ID，避免重复推入
+2. 检查Rig是否可以合并，如果新Rig和栈顶Rig兼容（通过CompareCameraRigForMerging判断）且栈顶Rig允许合并，那么调用PushMergedEntry将新Rig合并到现有Entry里，而不是创建新Entry
+   > 这里的合并指的是当两个Rig存在嵌套关系的时候，因为两个Rig共用一个顶层，所以可以进行合并来避免两个相同顶层的Entry同时存在导致资源浪费
+   > 
+   > 合并仅仅覆盖参数，而不重写逻辑
+3. 否则创建新Entry
+
+TransientBlendStack的OnRun函数包含了该类在每帧运行时的核心算法，其包含五步：
+
+1. ResolveEntries：把弱引用转成强引用，清理无效Entry
+   > 为什么这里要将弱引用提升至强引用？
+   >  
+   > 1. 使用Pin()函数将弱引用临时提升至强引用，保证在整个OnRun执行期间Entry使用的Context始终有引用而不会被意外销毁
+   > 
+   > 2. 如果Pin()返回空说明Context已销毁，此时将Entry冻结（bIsFrozen = true），冻结的Entry不会被立刻移除，只是保留其在栈中的层级但不参与求值
+2. InternalPreBlendPrepare：收集所有节点的参数需求，运行Blend的Run()更新BlendFactor
+3. InternalPreBlendExecute：把所有Entry的输入变量按照BlendFactor混合并写给各Entry
+4. InternalUpdate：将混合后的变量输入运行每个Entry的节点树并运行
+5. InternalPostBlendExecute：把所有Entry的输出按BlendFactor混合，如果某个Entry的Blend达到100%且完成，那么它以下的所有Entry全部弹出
+
+#### PersistentBlendStack
+
+在PersistentBlendStack中的Entry新增了一系列变量，用FCameraRigEntryExtraInfo存储，且与每个Entry一一对应，其中就定义了StackOrder用于排序
+
+PersistentBlendStack通过在代码中手动控制何时Insert和Remove实现Rig的是否启用：
+
+**Insert**
+
+1. 遍历所有Entry检查是否有重复，如果已存在相同的CameraRig+EvaluationContext+StackOrder且未被冻结，则直接返回空ID
+2. 为该Rig创建UBlendStackRootNode，然后查找进入过渡（Params.TransitionOverride > EnterTransitions > PopBlend）
+3. 二分查找第一个StackOrder大于新值的位置并插入到他的前面
+4. 广播Rig插入事件
+
+**Remove**
+
+1. 按EntryID移除某个Entry或CameraRig+EvaluationContext移除所有匹配的Entry
+2. 找到目标后运行RemoveEntry()（这段逻辑比较复杂，可以看源码，总的来说就是找到过渡就用Exit过渡的反向，没找到就硬切）
+
+关于OnRun()函数每帧求值，与TransientBlendStack不同，PersistentBlendStack通过一个遍历循环进行每帧求值：
+
+1. 从下层获取到计算结果的CameraPose作为起始输入
+2. 继承其他参数
+3. 遍历所有标记了NeedsParameterUpdate的Evaluator，收集参数
+4. 执行Run()更新BlendFactor
+5. 按BlendFactor混合输入变量到OutResult
+6. 运行Rig的整个节点树，输出写入CurReslt
+7. 按BlendFactor混合子结果到OutResult
+8. 更新Blend状态，如果是BlendIn且已完成，状态变为None；若是BlendOut且已完成，清理该Blend
+
+每个Entry的输入就是上一个Entry的输出，是一层层累加的，
+
 ### Gameplay Camera Component
 
 即在蓝图中添加的Component
@@ -836,6 +908,10 @@ LinearBlend（线性过渡）的OnComputeBlendFactor就是简单的BlendFactor=t
 3. 实现OnBuild：用Params.BuildEvaluatorAs<T>(Node->ChildSlot)构建所有下一级子Evaluator
 4. 实现OnInitialize：初始化TCameraParameterReader，并用SetNodeEvaluatorFlags设置标签
 5. 实现OnRun：编写核心逻辑，将输出写入OutResult.CameraPose与OutResult.CameraRigJoints（如果像上文一样有其他系统的操作需求）
+
+### BlendCameraNode
+
+
 
 ## 一些问题与思考
 
