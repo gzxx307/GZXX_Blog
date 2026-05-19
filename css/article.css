@@ -118,6 +118,84 @@
     opacity: 0.7;
 }
 
+/* 搜索行：搜索框与标签分类按钮横向排列 */
+.search-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 24px;
+}
+
+/* 搜索框在搜索行内撑满剩余宽度 */
+.search-row .search-input {
+    flex: 1;
+    margin-bottom: 0;
+}
+
+/* 标签分类按钮 */
+.tag-filter-btn {
+    flex-shrink: 0;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: rgba(255, 255, 255, 0.85);
+    padding: 10px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    white-space: nowrap;
+    transition: background 0.2s, border-color 0.2s;
+}
+
+/* 标签分类按钮悬停 */
+.tag-filter-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+/* 标签分类按钮激活态（面板打开时） */
+.tag-filter-btn.active {
+    background: rgba(255, 255, 255, 0.25);
+    border-color: rgba(255, 255, 255, 0.5);
+}
+
+/* 标签列表面板 */
+.tag-list-panel {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 0;
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition: max-height 0.35s ease, opacity 0.25s ease, margin-bottom 0.35s ease;
+}
+
+/* 标签面板展开态 */
+.tag-list-panel.open {
+    max-height: 300px;
+    opacity: 1;
+    margin-bottom: 24px;
+}
+
+/* 标签面板中的标签项：可点击，带交互反馈 */
+.tag-list-panel .article-tag {
+    cursor: pointer;
+    padding: 6px 14px;
+    font-size: 13px;
+    transition: background 0.2s, border-color 0.2s, transform 0.15s;
+}
+
+/* 标签面板标签悬停 */
+.tag-list-panel .article-tag:hover {
+    background: rgba(255, 255, 255, 0.25);
+    transform: translateY(-1px);
+}
+
+/* 标签面板标签选中态 */
+.tag-list-panel .article-tag.active {
+    background: rgba(255, 255, 255, 0.3);
+    border-color: rgba(255, 255, 255, 0.5);
+}
+
 
 /* 文章详情页 */
 

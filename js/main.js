@@ -20,6 +20,10 @@ document.getElementById('back-btn').addEventListener('click', () => {
 document.getElementById('search-btn').addEventListener('click', () => {
     searchArticles(document.getElementById('search-input').value);
 });
+// 绑定标签分类按钮：点击切换标签面板
+document.getElementById('tag-filter-btn').addEventListener('click', () => {
+    toggleTagPanel();
+});
 
 // 页面初始化
 

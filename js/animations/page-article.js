@@ -19,14 +19,20 @@ PAGE_ANIMATIONS['page-article'] = {
             // 若无卡片则直接完成
             if (cards.length === 0) { resolve(); return; }
 
-            // 获取搜索框容器
-            const searchBox = el.querySelector('.search-input');
+            // 确保标签筛选状态在每次进入文章列表页时被重置（关闭面板、清除选中）
+            // 处理 hash 直接跳转、从详情页返回等场景，保证进入时面板始终关闭
+            if (typeof resetTagFilter === 'function') {
+                resetTagFilter();
+            }
 
-            // 初始状态：搜索框与各卡片均下移 24px 且透明
-            if (searchBox) {
-                searchBox.style.transition = 'none';
-                searchBox.style.transform = 'translateY(24px)';
-                searchBox.style.opacity = '0';
+            // 获取搜索行容器（包含搜索框与标签分类按钮）
+            const searchRow = el.querySelector('.search-row');
+
+            // 初始状态：搜索行与各卡片均下移 24px 且透明
+            if (searchRow) {
+                searchRow.style.transition = 'none';
+                searchRow.style.transform = 'translateY(24px)';
+                searchRow.style.opacity = '0';
             }
             cards.forEach(card => {
                 card.style.transition = 'none';
@@ -37,12 +43,12 @@ PAGE_ANIMATIONS['page-article'] = {
             // 双层 rAF 确保初始状态渲染后再开启过渡
             requestAnimationFrame(() => {
                 requestAnimationFrame(() => {
-                    // 为搜索框添加过渡
-                    if (searchBox) {
-                        searchBox.style.transition = `transform ${_ARTICLE_MS}ms cubic-bezier(0.4, 0, 0.2, 1),`
+                    // 为搜索行添加过渡（搜索框+标签按钮一起动画）
+                    if (searchRow) {
+                        searchRow.style.transition = `transform ${_ARTICLE_MS}ms cubic-bezier(0.4, 0, 0.2, 1),`
                                                    + `opacity ${_ARTICLE_MS}ms ease`;
-                        searchBox.style.transform = 'translateY(0)';
-                        searchBox.style.opacity = '1';
+                        searchRow.style.transform = 'translateY(0)';
+                        searchRow.style.opacity = '1';
                     }
                     // 依次为每张卡片设置延迟过渡
                     cards.forEach((card, i) => {
@@ -56,7 +62,7 @@ PAGE_ANIMATIONS['page-article'] = {
                     // 等待所有卡片动画结束后清理内联样式并 resolve
                     const total = _ARTICLE_MS + (cards.length - 1) * _ARTICLE_STAGGER;
                     setTimeout(() => {
-                        if (searchBox) { searchBox.style.cssText = ''; }
+                        if (searchRow) { searchRow.style.cssText = ''; }
                         cards.forEach(card => { card.style.cssText = ''; });
                         resolve();
                     }, total + 20);
@@ -65,24 +71,30 @@ PAGE_ANIMATIONS['page-article'] = {
         });
     },
 
-    // 退出时各卡片与搜索框依次向下淡出
+    // 退出时各卡片与搜索行依次向下淡出
     exit(el, forward) {
         return new Promise(resolve => {
-            // 获取搜索框与所有卡片
-            const searchBox = el.querySelector('.search-input');
+            // 获取搜索行（含搜索框+标签按钮）与所有卡片
+            const searchRow = el.querySelector('.search-row');
             const cards = Array.from(el.querySelectorAll('.card'));
 
+            // 退出时关闭标签面板并重置按钮状态，确保下次进入时面板处于关闭状态
+            const tagPanel = el.querySelector('#tag-list-panel');
+            const tagBtn = el.querySelector('#tag-filter-btn');
+            if (tagPanel) tagPanel.classList.remove('open');
+            if (tagBtn) tagBtn.classList.remove('active');
+
             // 若无内容则回退到默认滑出
-            if (!searchBox && cards.length === 0) {
+            if (!searchRow && cards.length === 0) {
                 return PAGE_ANIMATIONS['default'].exit(el, forward).then(resolve);
             }
 
-            // 搜索框与卡片同步向下淡出，搜索框无延迟
-            if (searchBox) {
-                searchBox.style.transition = `transform ${_ARTICLE_MS}ms cubic-bezier(0.4, 0, 0.2, 1),`
+            // 搜索行与卡片同步向下淡出，搜索行无延迟
+            if (searchRow) {
+                searchRow.style.transition = `transform ${_ARTICLE_MS}ms cubic-bezier(0.4, 0, 0.2, 1),`
                                            + `opacity ${_ARTICLE_MS}ms ease`;
-                searchBox.style.transform = 'translateY(24px)';
-                searchBox.style.opacity = '0';
+                searchRow.style.transform = 'translateY(24px)';
+                searchRow.style.opacity = '0';
             }
             // 各卡片依次向下淡出
             cards.forEach((card, i) => {

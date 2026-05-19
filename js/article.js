@@ -8,6 +8,8 @@ let filteredArticles = ARTICLES_DATA.slice();
 
 // 动画过程中拒绝再触发动画
 let isArticleAnimating = false;
+// 当前选中的标签，null 表示未选中
+let selectedTag = null;
 
 // 当过滤结果为空时，显示默认提示信息
 function showNoResults() {
@@ -147,6 +149,10 @@ function searchArticles(keyword) {
     if (isArticleAnimating) return;
     // 设置动画锁，防止在动画过程中再次触发搜索
     isArticleAnimating = true;
+    // 清除标签筛选状态
+    selectedTag = null;
+    const tagEls = document.querySelectorAll('#tag-list-panel .article-tag');
+    tagEls.forEach(el => el.classList.remove('active'));
     // 去除输入两端空白并转换为小写，进行不区分大小写的搜索
     const query = keyword.trim().toLowerCase();
     // 如果输入为空，则显示全部文章
@@ -176,4 +182,105 @@ function searchArticles(keyword) {
     );
     // 解除动画锁
     isArticleAnimating = false;
+}
+
+// 从 ARTICLES_DATA 中提取所有唯一标签并排序
+function getAllTags() {
+    const tagSet = new Set();
+    ARTICLES_DATA.forEach(article => {
+        article.tags.forEach(tag => tagSet.add(tag));
+    });
+    return [...tagSet].sort();
+}
+
+// 渲染标签列表到标签面板
+function renderTagList() {
+    const panel = document.getElementById('tag-list-panel');
+    if (!panel) return;
+    const tags = getAllTags();
+    // 生成标签 HTML，当前选中标签添加 active 类
+    panel.innerHTML = tags.map(tag => {
+        const isActive = tag === selectedTag;
+        return `<span class="article-tag ${isActive ? 'active' : ''}" data-tag="${tag}">${tag}</span>`;
+    }).join('');
+    // 为每个标签绑定点击过滤事件
+    panel.querySelectorAll('.article-tag').forEach(tagEl => {
+        tagEl.addEventListener('click', () => {
+            const tag = tagEl.dataset.tag;
+            if (selectedTag === tag) {
+                // 取消选中状态，显示全部文章
+                filterByTag(null);
+            } else {
+                // 选中标签并按标签过滤文章
+                filterByTag(tag);
+            }
+        });
+    });
+}
+
+// 按标签过滤文章列表
+function filterByTag(tag) {
+    // 如果在动画中则不响应
+    if (isArticleAnimating) return;
+    isArticleAnimating = true;
+    // 更新选中标签状态
+    selectedTag = tag;
+    // 更新标签面板中各标签的激活样式
+    const tagEls = document.querySelectorAll('#tag-list-panel .article-tag');
+    tagEls.forEach(el => {
+        el.classList.toggle('active', el.dataset.tag === tag);
+    });
+    // 清除搜索框内容
+    document.getElementById('search-input').value = '';
+    // 按标签过滤或显示全部文章
+    if (!tag) {
+        filteredArticles = ARTICLES_DATA.slice();
+    } else {
+        filteredArticles = ARTICLES_DATA.filter(article => article.tags.includes(tag));
+    }
+    // 若过滤结果为空则显示提示
+    if (filteredArticles.length === 0) {
+        showNoResults();
+    }
+    // 复用搜索动画：旧卡片淡出 → 更新列表 → 新卡片淡入
+    PAGE_ANIMATIONS['page-article-search'].enter(
+        document.getElementById('page-article'),
+        () => {
+            const container = document.getElementById('article-list');
+            container.innerHTML = '';
+            loadArticleList();
+        }
+    );
+    // 解除动画锁
+    isArticleAnimating = false;
+}
+
+// 切换标签面板的显示/隐藏
+function toggleTagPanel() {
+    const panel = document.getElementById('tag-list-panel');
+    const btn = document.getElementById('tag-filter-btn');
+    if (!panel || !btn) return;
+    const isOpen = panel.classList.contains('open');
+    if (isOpen) {
+        // 关闭面板
+        panel.classList.remove('open');
+        btn.classList.remove('active');
+    } else {
+        // 打开面板前渲染最新的标签列表
+        renderTagList();
+        panel.classList.add('open');
+        btn.classList.add('active');
+    }
+}
+
+// 重置标签筛选状态：关闭面板、清除选中、恢复按钮样式
+function resetTagFilter() {
+    selectedTag = null;
+    const panel = document.getElementById('tag-list-panel');
+    const btn = document.getElementById('tag-filter-btn');
+    if (panel) panel.classList.remove('open');
+    if (btn) btn.classList.remove('active');
+    // 清除标签面板中各标签的激活样式
+    const tagEls = document.querySelectorAll('#tag-list-panel .article-tag');
+    tagEls.forEach(el => el.classList.remove('active'));
 }
