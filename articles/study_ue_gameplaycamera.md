@@ -97,7 +97,7 @@ Tags: UE, 经验, 知识
 
 事实上，创建CameraAsset的时候选择的分类，实际上都是继承自UCameraAsset，只是他们的Director有所不同。在源码中，设计了Director不同时显示不同字段。
 
-所以实际上，选择CameraAsset分类的过程就是在选择CameraDirector的父类
+所以实际上，选择CameraAsset分类的过程就是在选择CameraDirector的子类
 
 ![cd](study_ue_gameplaycamera/choose_director.png)
 
@@ -113,9 +113,9 @@ CameraAsset中还有一个“共享过渡”，共享过渡是当该CameraAsset�
 
 > 过渡在后面的[过渡](#过渡)
 
-CameraRig的映射表放置所有该CameraAsset能够切换和调用的CameraRig，并通过DirectorEvaluator实现CameraRig或CameraRigProxy之间的切换
+CameraDirector中有一个CameraRigProxyRedirectTable（Proxy-Rig映射表），DirectorEvaluator通过该表实现CameraRig或CameraRigProxy之间的切换。注意该映射表属于CameraDirector而非CameraAsset
 
-在运行时，CameraAsset会被实例化，此时产生CameraEvaluationContext（CameraAsset中挂载数据、配置变量，而CameraEvaluationContext则是运行时状态）。运行时，同一个CameraAsset可以同时产生多个Context（比如多人游戏中每个玩家一个，类似PlayerState）
+在运行时，CameraAsset作为资产被引用，每个玩家会创建一个独立的FCameraEvaluationContext而非实例化CameraAsset本身，同一个CameraAsset可以被多个Context同时引用，比如多人游戏中每个玩家一个，类似PlayerState
 
 ### CameraEvaluationContext
 
@@ -146,7 +146,7 @@ UE目前为Director设计了四个不同的子类，每个子类都实现父类�
 
 **该Director只适用于C++工程，纯蓝图工程无法使用该Director！如果要在纯蓝图项目中实现按照优先级选择摄像机，应该使用Blueprint Camera Director**
 
-选择该导演类型时，你无法在纯蓝图中确定好CameraRig的切换逻辑，因为程序完全没有为蓝图暴露除数组外的其他任何可覆盖或可编程内容，该类是专门为C++部分暴露接口用的，要写逻辑要在C++里写
+选择该导演类型时，你无法在纯蓝图中确定好CameraRig的切换逻辑，因为程序完全没有为蓝图暴露任何可配置属性或可重载函数。UPriorityQueueCameraDirector只有一个构造函数和OnBuildEvaluator，无任何UPROPERTY暴露给编辑器。该类是专门为C++部分暴露接口用的，要写逻辑要在C++里写
 
 ![pqcd](study_ue_gameplaycamera/priority_queue_camera_director.png)
 
@@ -156,7 +156,7 @@ UE目前为Director设计了四个不同的子类，每个子类都实现父类�
 
 单一摄像机导演只拥有一个摄像机绑定，如果只有一个摄像机绑定的话，比起蓝图摄像机导演就只有创建更方便了
 
-> 下面的摄像机绑定代理数组是多余的，只是由于他继承了Director基类所以显示出来了，但并没有任何作用
+> 下面的CameraRigProxyRedirectTable（Proxy-Rig映射表）是继承自UCameraDirector基类的，对该Director来说没有任何作用
 
 ![scd](study_ue_gameplaycamera/single_camera_director.png)
 
@@ -343,6 +343,8 @@ CameraRig的执行和计算涉及到多个类的协同工作，这些类在下�
 
 每次查找都会进行条件匹配，如果条件匹配成功则使用该过渡，如果没有则顺延到下一个过渡。如果四步都没找到则直接硬切
 
+> 注意：这个完整的四步查找优先级仅适用于TransientBlendStack的Push操作。PersistentBlendStack的Insert只看EnterTransition，Remove只看ExitTransition
+
 ##### UCameraRigTransition
 
 条件匹配定义在了UCameraRigTransition类中，这个类对应蓝图中的节点就是每次创建Enter或者Exit时必须添加的第一个节点
@@ -401,7 +403,7 @@ BlendStack顾名思义称作混合栈，它通过拥有多个CameraRig的Entry�
 ECameraBlendStackType枚举区分了BlendStack的两种模式：
 
 1. IsolatedTransient：栈里的每个Rig独立求值，求值后按BlendFactor（可以理解为混合进度）把结果混合到一起，当最上层的Blend达到100%时，下面的所有Rig自动弹出，一般用于做摄像机模式切换
-2. AdditivePersistent：栈里的Rig累加求值，即下层的Rig的求值结果会成为上层Rig的输入，且Rig不会自动移除，必须手动Remove，每个Entry会有一个StackOrder决定它在栈中的顺序，值越大越靠上，一般用于层叠摄像机修改器（比如位移+后处理+特效等）
+2. AdditivePersistent：栈里的Rig累加求值，即遍历时维持一个全局累积结果（OutResult），下层Rig将自身的CameraPose从OutResult继承、修改后再写回OutResult，这样逐层累加传递。Rig不会自动移除，必须手动Remove，每个Entry会有一个StackOrder决定它在栈中的顺序，值越大越靠上，一般用于层叠摄像机修改器（比如位移+后处理+特效等）
 
 UBlendStackCameraNode对应的运行时层为FBlendStackCameraNodeEvaluator，其包含所有的共用逻辑（Entry管理、序列化、冻结、事件广播等），BlendStack两种模式对应的两种子类只实现不同的更新算法
 
@@ -466,7 +468,7 @@ PersistentBlendStack通过在代码中手动控制何时Insert和Remove实现Rig
 
 即在蓝图中添加的Component
 
-GameplayCameraComponent是一个SenceComponent，其在Actor中的主要功能是持有CameraAsset引用、创建运行时EvaluationContext、把求值结果输出给引擎的摄像机系统
+GameplayCameraComponent是一个SceneComponent，其在Actor中的主要功能是持有CameraAsset引用、创建运行时EvaluationContext、把求值结果输出给引擎的摄像机系统
 
 与GameplayCameraComponent并列的还有一个GameplayCameraRigComponent，与GameplayCameraComponent不同的是，其持有的引用为单个CameraRig而非一个CameraAsset
 
@@ -475,7 +477,7 @@ GameplayCameraComponent是一个SenceComponent，其在Actor中的主要功能�
 其有以下核心属性：
 
 - FCameraAssetReference CameraReference（GameplayCameraComponent）：引用要运行的CameraAsset（FCameraAssetReference是一个包装器结构体，里面有CameraAsset和Params）
-- FCameraRigAssetReference CameraRigReference（GameplayCameraRigComponnet）：引用CameraRig
+- FCameraRigAssetReference CameraRigReference（GameplayCameraRigComponent）：引用CameraRig
 - TEnumAsByte<EAutoReceiveInput::Type> AutoActivateForPlayer：是否在BeginPlay时自动为指定玩家激活，每一个玩家下标为一个枚举值
 - bool bSetControlRotationWhenViewTarget：是否将计算结果回写至PlayerController的ControlRotation
 - bool bRunInEditor：编辑器中是否也运行摄像机（用于预览的小窗）
@@ -488,7 +490,7 @@ GameplayCameraComponent是一个SenceComponent，其在Actor中的主要功能�
 ### 运行时实例化
 
 1. 从UGameplayCameraComponentBase继承而来的GameplayCameraComponent执行BeginPlay()
-2. UGameplayCameraComponentBase::BeginPlay()->如果启用“为玩家自动启用”则调用ActivateCameraForPlayerIndex(PlayerIndex)间接调用ActivateCameraForPlayerController，否则直接调用ForPlayerController创建，但不给任何Controller
+2. UGameplayCameraComponentBase::BeginPlay()->如果启用”为玩家自动启用”则调用ActivateCameraForPlayerIndex(PlayerIndex)间接调用ActivateCameraForPlayerController，否则直接调用ActivateCameraForPlayerController(nullptr, false, Push)创建Context，但传入空PlayerController
    > Context进入时其实进入的是ContextStack栈
    > 
    > GetActiveContext()方法永远返回栈顶，摄像机系统每帧只处理栈顶的Context
@@ -496,15 +498,15 @@ GameplayCameraComponent是一个SenceComponent，其在Actor中的主要功能�
    > 这里的ActivationMode有三种模式，分别在ActivateCameraEvaluationContext()函数中switch三个不同的行为：
    > 
    > 1. Push：新Context成为栈顶，一般用于完全切换到另一个摄像机
-   > 2. PushAndInsert：旧的栈顶Context被设为新Context的子Context，新的Context成为栈顶，一般用于扩展摄像机功能
+   > 2. PushAndInsert：旧的栈顶Context先从ContextStack中移除，再被设为新Context的子Context，新的Context成为栈顶，一般用于扩展摄像机功能
    > 3. InsertOrPush：如果栈里有东西（即有ActiveContext），那么新Context成为旧Context的子Context，否则操作退化为Push
-3. ActivateCameraForPlayerController()->先Deactivate所有Context，然后获取PlayerControllerHost，调用ActivateCameraEvaluationContext()并传入对应PlayerController
+3. ActivateCameraForPlayerController()->先Deactivate当前组件自身的Context（调用DeactivateCameraEvaluationContext(true)），然后获取PlayerControllerHost，再调用ActivateCameraEvaluationContext()并传入对应PlayerController
 4. ActivateCameraEvaluationContext()->调用CreateCameraEvaluationContext(PlayerController)并应用ActivateMode行为
 5. CreateCameraEvaluationContext()->创建EvaluationContext并初始化所有属性
 6. 在ActivateCameraEvaluationContext调用时，会将Context Push到ContextStack中，并让Stack执行Context->Activate(ActivateParams)激活最新的Context
 7. FCameraEvaluationContext::Activate(ActivateParams)->调用AutoCreateDirectorEvaluator
 8. 在AutoCreateDirectorEvaluator函数中，获取到我们创建CameraAsset时选择的CameraDirector类，创建一个Builder并调用该类的BuildEvaluator(Builder)方法获得DirectorEvaluator并初始化。BuildEvaluator方法调用OnBuildEvaluator虚函数，这个虚函数在每个子类中各自实现
-   > **这里的Builder有什么用？**
+   > Builder的作用是构建类对应的Evaluator树，负责创建树中所有的FCameraNodeEvaluator实例并在实例之间建立父子关系
 9. 执行DirectorEvaluator->Activate()，将自身的FCameraSystemEvaluator* Evaluator变量设为当前Context配置的Evaluator，并触发BlueprintCameraDirectorEvaluator的ActivateCameraDirector事件
 
 ### 每帧更新
