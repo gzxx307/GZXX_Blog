@@ -1017,3 +1017,17 @@ UPROPERTY的Instanced关键字是什么意思？为什么在这个插件的源�
 > 
 > - DefaultToInstanced：当类本身标记了这个，类里的UPROPERTY即使不写Instanced也会默认instanced，但是一般还是显式写，因为不是每个属性都要Instanced，而且显式写更直观
 > - EditInlineNew：允许在编辑器的Details面板中直接通过"+"按钮新建该类的内嵌对象，例如上文提到的在CameraAsset的细节面板里创建BlueprintCameraDirectorEvaluator时点的"+"号
+
+### 为什么有些Evaluator的定义直接写在.cpp文件里
+
+例如class FLinearBlendCameraNodeEvaluator，该Evaluator类直接定义在LinearBlendCameraNode.cpp文件中而不是在h文件命名再在cpp文件实现
+
+我们发现该类只在一个地方被实例化，即下方的ULinearBlendCameraNode::OnBuildEvaluator()，而这个函数也在同一个cpp文件里
+
+有三个好处：
+
+1. 你不需要为该类单独创建一个头文件，其他翻译单元编译时不会看到这个类，也不会因为它的改动而重新编译
+2. 外部代码只需要知道存在ULinearBlendCameraNode这个数据类即可，而不需要知道Evaluator的运行时细节
+3. 如果有人想继承FLinearBlendCameraNodeEvaluator，它无法引入一个cpp文件，这样能够防止该类被误继承
+
+而像FSimpleFixedTimeBlendCameraNodeEvaluator定义在 SimpleBlendCameraNode.h头文件里，是因为它要被LinearBlend、SmoothBlend等多个子类继承，官方将其设计为一个可扩展的基类，必须暴露出去。
