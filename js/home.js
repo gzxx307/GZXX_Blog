@@ -143,16 +143,18 @@ function loadLatestArticleCard() {
     // 点击跳转到文章详情
     card.addEventListener('click', () => openArticle(latest));
 }
-// 加载随机推荐文章到主页卡片
+// 当前随机推荐卡片展示的文章引用，供卡片点击事件使用
+let _currentRandomArticle = null;
+
+// 加载随机推荐文章到主页卡片（仅首次调用，创建按钮并绑定事件）
 function loadRandomArticleCard() {
     const random = getRandomArticle();
+    _currentRandomArticle = random;
     const card = document.getElementById('mc-recommend');
     if (!card) return;
     const content = card.querySelector('.mc-content');
     if (!content) return;
-    // 将 tags 数组转为标签 HTML
     const randomTagsHtml = random.tags.map(tag => `<span class="article-tag">${tag}</span>`).join('');
-    // 用SVG绘制刷新图标
     content.innerHTML = `
         <div class="random-article-card">
             <div class="random-card-header">
@@ -169,20 +171,49 @@ function loadRandomArticleCard() {
             <div class="article-tags">${randomTagsHtml}</div>
         </div>
     `;
-    // 刷新按钮：重新随机一篇，阻止冒泡以避免触发卡片跳转
+    // 刷新按钮：立即更新文本内容 + 同时播放旋转动画，互不阻塞
     content.querySelector('.random-refresh-btn').addEventListener('click', e => {
         e.stopPropagation();
-        // 如果随机到相同文章则切换到下一文章，保证刷新不重复
-        randomArticleNewIndex = Math.floor(Math.random() * BLOG_ARTICLES.length);
-        if (randomArticleNewIndex === randomArticleIndex) {
-            randomArticleNewIndex = (randomArticleNewIndex + 1) % BLOG_ARTICLES.length;
-        }
-        randomArticleIndex = randomArticleNewIndex;
-
-        loadRandomArticleCard();
+        const btn = e.currentTarget;
+        // 先立即刷新卡片文本内容（同步，不等待动画）
+        refreshRandomArticleCard();
+        // 同时播放按钮旋转动画，动画独立运行不影响卡片内容
+        const isHovering = btn.matches(':hover');
+        const startAngle = isHovering ? 180 : 0;
+        btn.animate([
+            { transform: `rotate(${startAngle}deg)` },
+            { transform: `rotate(${startAngle + 360}deg)` }
+        ], {
+            duration: 600,
+            easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
+        });
     });
-    // 点击卡片跳转到文章详情
-    card.addEventListener('click', () => openArticle(random));
+    // 使用 onclick 确保只绑定一次（每次调用不会重复累加监听器）
+    card.onclick = () => openArticle(_currentRandomArticle);
+}
+
+// 仅刷新随机推荐卡片的文本内容，不重建按钮 DOM
+function refreshRandomArticleCard() {
+    let newIndex = Math.floor(Math.random() * BLOG_ARTICLES.length);
+    if (newIndex === randomArticleIndex) {
+        newIndex = (newIndex + 1) % BLOG_ARTICLES.length;
+    }
+    randomArticleIndex = newIndex;
+    _currentRandomArticle = BLOG_ARTICLES[randomArticleIndex];
+    const article = _currentRandomArticle;
+    const card = document.getElementById('mc-recommend');
+    if (!card) return;
+    // 仅更新文本节点，不动按钮元素
+    const titleEl = card.querySelector('.random-article-title');
+    if (titleEl) titleEl.textContent = article.title;
+    const dateEl = card.querySelector('.random-article-date');
+    if (dateEl) dateEl.textContent = article.date;
+    const excerptEl = card.querySelector('.random-article-excerpt');
+    if (excerptEl) excerptEl.textContent = article.excerpt;
+    const tagsEl = card.querySelector('.article-tags');
+    if (tagsEl) {
+        tagsEl.innerHTML = article.tags.map(tag => `<span class="article-tag">${tag}</span>`).join('');
+    }
 }
 // 加载时间卡片
 function loadTimeCard() {
