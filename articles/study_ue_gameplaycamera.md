@@ -911,7 +911,66 @@ LinearBlend（线性过渡）的OnComputeBlendFactor就是简单的BlendFactor=t
 
 ### BlendCameraNode
 
+创建自定义Blend节点和自定义普通CameraNode流程类似，同样分为数据层和运行时层，一般只需要继承固定时间混合的基类，然后重写一个函数即可
 
+以官方实现的LinearBlend和SmoothBlend为例：
+
+数据层部分，要使用线性物理时间功能，继承USimpleFixedTimeBlendCameraNode，并重写OnBuildEvaluator方法即可，如果需要额外参数，就像普通UObject类加UPROPERTY即可：
+
+```cpp
+UCLASS(MinimalAPI)
+class ULinearBlendCameraNode : public USimpleFixedTimeBlendCameraNode
+{
+	GENERATED_BODY()
+protected:
+	virtual FCameraNodeEvaluatorPtr OnBuildEvaluator(FCameraNodeEvaluatorBuilder& Builder) const override;
+};
+
+UCLASS(MinimalAPI)
+class USmoothBlendCameraNode : public USimpleFixedTimeBlendCameraNode
+{
+	GENERATED_BODY()
+public:
+	void SetCameraBlendType(ESmoothCameraBlendType BlendTypeIn) { BlendType = BlendTypeIn; }
+protected:
+	virtual FCameraNodeEvaluatorPtr OnBuildEvaluator(FCameraNodeEvaluatorBuilder& Builder) const override;
+public:
+	/** The type of algorithm to use. */
+	UPROPERTY(EditAnywhere, Category=Blending)
+	ESmoothCameraBlendType BlendType;
+};
+```
+
+运行时层部分，继承响应的Evaluator类，如果继承FSimpleFixedTimeBlendCameraNodeEvaluator，那么它已经提供了计时器、BlendFactor的基础管理以及默认线性插值实现了，只需要重写OnComputeBlendFactor，定义从t到BlendFactor的映射即可
+
+例如LinearBlend直接使用线性插值，而SmoothBlend使用平滑曲线：
+
+```cpp
+class FLinearBlendCameraNodeEvaluator : public FSimpleFixedTimeBlendCameraNodeEvaluator
+{
+	UE_DECLARE_BLEND_CAMERA_NODE_EVALUATOR_EX(GAMEPLAYCAMERAS_API, FLinearBlendCameraNodeEvaluator, FSimpleFixedTimeBlendCameraNodeEvaluator)
+
+protected:
+	virtual void OnComputeBlendFactor(const FCameraNodeEvaluationParams& Params, FSimpleBlendCameraNodeEvaluationResult& OutResult) override;
+};
+
+UE_DEFINE_BLEND_CAMERA_NODE_EVALUATOR(FLinearBlendCameraNodeEvaluator)
+
+void FLinearBlendCameraNodeEvaluator::OnComputeBlendFactor(const FCameraNodeEvaluationParams& Params, FSimpleBlendCameraNodeEvaluationResult& OutResult)
+{
+	const ULinearBlendCameraNode* BlendNode = GetCameraNodeAs<ULinearBlendCameraNode>();
+	OutResult.BlendFactor = FMath::Lerp(0.f, 1.f, GetTimeFactor());
+}
+```
+
+其他扩展：
+
+- 自定义混合曲线：重写OnComputeBlendFactor
+- 自定义参数混合方式：重写OnBlendParameters
+- 自定义结果混合方式：OnBlendResults
+- 支持直接反向：重写OnSetReversed使其返回true
+- 支持中断衔接：重写OnInitializeFromInterruption使其返回true
+- 不依赖固定时间：直接继承FSimpleBlendCameraNodeEvaluator或 FBlendCameraNodeEvaluator，自己管理BlendFactor的变化逻辑
 
 ## 一些问题与思考
 
