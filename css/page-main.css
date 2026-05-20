@@ -338,21 +338,49 @@
     gap: 2px;
 }
 
-/* 时:分 主显示，加粗大字 */
+/* 时:分 主显示，加粗大字，flex 排列数字遮罩与冒号 */
 .time-main {
+    display: flex;
+    align-items: center;
+    justify-content: center;
     font-size: 32px;
     font-weight: 700;
-    letter-spacing: 3px;
     line-height: 1;
 }
 
-/* 秒数，半透明小字 */
+/* 秒数，半透明小字，flex 排列数字遮罩 */
 .time-seconds {
+    display: flex;
+    align-items: center;
+    justify-content: center;
     font-size: 16px;
     font-weight: 400;
-    letter-spacing: 2px;
     color: rgba(255, 255, 255, 0.6);
     line-height: 1;
+}
+
+/* 数字组：水平排列各位数字遮罩 */
+.time-digits {
+    display: flex;
+}
+
+/* 冒号分隔符 */
+.time-colon {
+    margin: 0 2px;
+}
+
+/* 数字遮罩：裁剪只显示一个数字高度，其余由 translateY 控制滚动 */
+.time-digit-mask {
+    overflow: hidden;
+    height: 1em;
+}
+
+/* 数字列内单个数字：高度 = 1em，行高 = 1，居中对齐 */
+.time-digit-strip span {
+    display: block;
+    height: 1em;
+    line-height: 1;
+    text-align: center;
 }
 
 /* 星期，更小更淡 */

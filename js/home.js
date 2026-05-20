@@ -264,31 +264,158 @@ function loadTimeCard() {
     // 星期中文名称
     const WEEKDAY_NAMES = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
 
-    // 插入时间卡片结构
+    // 插入时间卡片骨架：时、分、秒各占一个 .time-digits，内部由 JS 填充数字遮罩
     content.innerHTML = `
         <div class="time-card">
-            <div class="time-main"></div>
-            <div class="time-seconds"></div>
+            <div class="time-main">
+                <div class="time-digits" id="tc-hours"></div>
+                <span class="time-colon">:</span>
+                <div class="time-digits" id="tc-minutes"></div>
+            </div>
+            <div class="time-seconds">
+                <div class="time-digits" id="tc-seconds"></div>
+            </div>
             <div class="time-weekday"></div>
         </div>
     `;
 
-    const mainEl = content.querySelector('.time-main');
-    const secEl = content.querySelector('.time-seconds');
     const weekEl = content.querySelector('.time-weekday');
 
-    function updateTime() {
+    // 创建单个数字滚动器：遮罩 + 内部 0-9 重复两轮的竖列
+    function _createScroller() {
+        const mask = document.createElement('div');
+        mask.className = 'time-digit-mask';
+        const strip = document.createElement('div');
+        strip.className = 'time-digit-strip';
+        // 0-9 重复两轮共 20 个，确保始终可以「向上」滚动到目标数字
+        for (let i = 0; i < 20; i++) {
+            const span = document.createElement('span');
+            span.textContent = i % 10;
+            strip.appendChild(span);
+        }
+        mask.appendChild(strip);
+        return { mask, strip };
+    }
+
+    // 获取数字高度：span { height: 1em; line-height: 1 } → 高度=字号
+    function _getDigitHeight(strip) {
+        return parseFloat(getComputedStyle(strip).fontSize);
+    }
+
+    // 即刻设置数字（无动画）
+    function _setDigit(strip, digit) {
+        const h = _getDigitHeight(strip);
+        strip.style.transform = `translateY(${-digit * h}px)`;
+    }
+
+    // 向上滚动到目标数字，始终朝上方走（不减），duration 毫秒后结束
+    function _animateDigit(strip, fromDigit, toDigit, duration) {
+        if (fromDigit === toDigit) return;
+        // 向上滚动：to > from 则在第一轮到达，否则借助第二轮
+        const targetPos = toDigit > fromDigit ? toDigit : toDigit + 10;
+        const h = _getDigitHeight(strip);
+        const startY = -fromDigit * h;
+        const endY = -targetPos * h;
+
+        strip.style.transform = `translateY(${startY}px)`;
+        const anim = strip.animate([
+            { transform: `translateY(${startY}px)` },
+            { transform: `translateY(${endY}px)` }
+        ], {
+            duration: duration,
+            easing: 'cubic-bezier(0.3, 0, 0.2, 1)',
+            fill: 'forwards'
+        });
+        // 动画结束后取余归位（移除第二轮偏移）
+        anim.onfinish = () => {
+            strip.style.transform = `translateY(${-(targetPos % 10) * h}px)`;
+        };
+    }
+
+    // 构建 6 个数字滚动器并放入对应容器
+    const hTens = _createScroller();
+    const hOnes = _createScroller();
+    content.querySelector('#tc-hours').appendChild(hTens.mask);
+    content.querySelector('#tc-hours').appendChild(hOnes.mask);
+
+    const mTens = _createScroller();
+    const mOnes = _createScroller();
+    content.querySelector('#tc-minutes').appendChild(mTens.mask);
+    content.querySelector('#tc-minutes').appendChild(mOnes.mask);
+
+    const sTens = _createScroller();
+    const sOnes = _createScroller();
+    content.querySelector('#tc-seconds').appendChild(sTens.mask);
+    content.querySelector('#tc-seconds').appendChild(sOnes.mask);
+
+    // 解构当前时间
+    function _getTimeParts() {
         const now = new Date();
-        // 格式化时、分、秒，不足两位补零
         const h = String(now.getHours()).padStart(2, '0');
         const m = String(now.getMinutes()).padStart(2, '0');
         const s = String(now.getSeconds()).padStart(2, '0');
-        mainEl.textContent = `${h}:${m}`;
-        secEl.textContent = s;
-        weekEl.textContent = WEEKDAY_NAMES[now.getDay()];
+        return {
+            hT: +h[0], hO: +h[1],
+            mT: +m[0], mO: +m[1],
+            sT: +s[0], sO: +s[1],
+            weekday: WEEKDAY_NAMES[now.getDay()]
+        };
     }
-    updateTime();
-    setInterval(updateTime, 1000);
+
+    // 初始状态：所有数字置为 0
+    [hTens, hOnes, mTens, mOnes, sTens, sOnes].forEach(s => _setDigit(s.strip, 0));
+
+    const initial = _getTimeParts();
+    weekEl.textContent = initial.weekday;
+
+    // 初始化动画：所有数字从 0 同时出发，相同时长内到达各自目标
+    // 距离越远滚动越快，保证同时到达
+    const INIT_DURATION = 1000;
+    const targets = [
+        { strip: hTens.strip, to: initial.hT },
+        { strip: hOnes.strip, to: initial.hO },
+        { strip: mTens.strip, to: initial.mT },
+        { strip: mOnes.strip, to: initial.mO },
+        { strip: sTens.strip, to: initial.sT },
+        { strip: sOnes.strip, to: initial.sO }
+    ];
+
+    // 双层 rAF 等待 DOM 布局完成后再启动动画
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+            targets.forEach(({ strip, to }) => {
+                if (to === 0) return; // 已经是 0，不动
+                const h = _getDigitHeight(strip);
+                strip.animate([
+                    { transform: `translateY(0px)` },
+                    { transform: `translateY(${-to * h}px)` }
+                ], {
+                    duration: INIT_DURATION,
+                    easing: 'cubic-bezier(0.3, 0, 0.2, 1)',
+                    fill: 'forwards'
+                }).onfinish = () => {
+                    strip.style.transform = `translateY(${-to * h}px)`;
+                };
+            });
+        });
+    });
+
+    // 常规更新：每秒检测变化，仅对变更的数字执行单步滚动
+    let prev = initial;
+    setInterval(() => {
+        const cur = _getTimeParts();
+        weekEl.textContent = cur.weekday;
+        const STEP_MS = 200;
+
+        if (cur.hT !== prev.hT) _animateDigit(hTens.strip, prev.hT, cur.hT, STEP_MS);
+        if (cur.hO !== prev.hO) _animateDigit(hOnes.strip, prev.hO, cur.hO, STEP_MS);
+        if (cur.mT !== prev.mT) _animateDigit(mTens.strip, prev.mT, cur.mT, STEP_MS);
+        if (cur.mO !== prev.mO) _animateDigit(mOnes.strip, prev.mO, cur.mO, STEP_MS);
+        if (cur.sT !== prev.sT) _animateDigit(sTens.strip, prev.sT, cur.sT, STEP_MS);
+        if (cur.sO !== prev.sO) _animateDigit(sOnes.strip, prev.sO, cur.sO, STEP_MS);
+
+        prev = cur;
+    }, 1000);
 }
 
 // 加载日历卡片
