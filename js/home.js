@@ -146,6 +146,38 @@ function loadLatestArticleCard() {
 // 当前随机推荐卡片展示的文章引用，供卡片点击事件使用
 let _currentRandomArticle = null;
 
+// 刷新按钮旋转状态：累积目标角度 + 帧循环插值
+let _rbTargetAngle = 0;     // 目标累积角度（mouseenter +180, mouseleave -180, click +360）
+let _rbCurrentAngle = 0;    // 当前渲染角度
+let _rbAnimId = null;       // rAF 句柄，null 表示循环已停止
+
+// 刷新按钮旋转动画循环：每帧向目标角度插值
+function _rbTick(btn) {
+    // 按钮已从 DOM 移除则停止循环
+    if (!btn.isConnected) { _rbAnimId = null; return; }
+    const diff = _rbTargetAngle - _rbCurrentAngle;
+    // 差值足够小时视为到达，取余防止数值溢出
+    if (Math.abs(diff) < 0.3) {
+        _rbCurrentAngle = _rbTargetAngle;
+        _rbTargetAngle %= 360;
+        _rbCurrentAngle %= 360;
+        btn.style.transform = `rotate(${_rbCurrentAngle}deg)`;
+        _rbAnimId = null;
+        return;
+    }
+    // 每帧移动剩余差值的 18%
+    _rbCurrentAngle += diff * 0.18;
+    btn.style.transform = `rotate(${_rbCurrentAngle}deg)`;
+    _rbAnimId = requestAnimationFrame(() => _rbTick(btn));
+}
+
+// 确保动画循环在运行（空闲时启动）
+function _rbEnsureAnim(btn) {
+    if (!_rbAnimId) {
+        _rbAnimId = requestAnimationFrame(() => _rbTick(btn));
+    }
+}
+
 // 加载随机推荐文章到主页卡片（仅首次调用，创建按钮并绑定事件）
 function loadRandomArticleCard() {
     const random = getRandomArticle();
@@ -171,23 +203,30 @@ function loadRandomArticleCard() {
             <div class="article-tags">${randomTagsHtml}</div>
         </div>
     `;
-    // 刷新按钮：立即更新文本内容 + 同时播放旋转动画，互不阻塞
-    content.querySelector('.random-refresh-btn').addEventListener('click', e => {
-        e.stopPropagation();
-        const btn = e.currentTarget;
-        // 先立即刷新卡片文本内容（同步，不等待动画）
-        refreshRandomArticleCard();
-        // 同时播放按钮旋转动画，动画独立运行不影响卡片内容
-        const isHovering = btn.matches(':hover');
-        const startAngle = isHovering ? 180 : 0;
-        btn.animate([
-            { transform: `rotate(${startAngle}deg)` },
-            { transform: `rotate(${startAngle + 360}deg)` }
-        ], {
-            duration: 600,
-            easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
-        });
+
+    const btn = content.querySelector('.random-refresh-btn');
+
+    // 鼠标进入：目标角度 +180，启动帧循环向新目标插值
+    btn.addEventListener('mouseenter', () => {
+        _rbTargetAngle += 180;
+        _rbEnsureAnim(btn);
     });
+
+    // 鼠标离开：目标角度 -180，启动帧循环向新目标插值
+    btn.addEventListener('mouseleave', () => {
+        _rbTargetAngle -= 180;
+        _rbEnsureAnim(btn);
+    });
+
+    // 点击：目标角度 +360，立即刷新卡片文本，启动帧循环
+    btn.addEventListener('click', e => {
+        e.stopPropagation();
+        // 先同步刷新卡片文本内容（不等待动画）
+        refreshRandomArticleCard();
+        _rbTargetAngle += 360;
+        _rbEnsureAnim(btn);
+    });
+
     // 使用 onclick 确保只绑定一次（每次调用不会重复累加监听器）
     card.onclick = () => openArticle(_currentRandomArticle);
 }

@@ -310,6 +310,7 @@
 }
 
 /* 刷新按钮：无边框，纯白图标，固定尺寸不参与 flex 伸缩 */
+/* 旋转由 JS 帧循环驱动，CSS 不再控制 transform */
 .random-refresh-btn {
     flex-shrink: 0;
     background: none;
@@ -317,14 +318,13 @@
     padding: 2px;
     cursor: pointer;
     opacity: 0.55;
-    transition: opacity 0.2s, transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: opacity 0.2s;
     line-height: 0;
 }
 
-/* 悬停时完全不透明并旋转半圈 */
+/* 悬停时完全不透明（旋转角度由 JS 帧循环累积，鼠标进入 +180，离开 -180） */
 .random-refresh-btn:hover {
     opacity: 1;
-    transform: rotate(180deg);
 }
 
 /* 时间卡片：纵向居中排列各元素 */
