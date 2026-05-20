@@ -974,6 +974,148 @@ void FLinearBlendCameraNodeEvaluator::OnComputeBlendFactor(const FCameraNodeEval
 - 支持中断衔接：重写OnInitializeFromInterruption使其返回true
 - 不依赖固定时间：直接继承FSimpleBlendCameraNodeEvaluator或 FBlendCameraNodeEvaluator，自己管理BlendFactor的变化逻辑
 
+### PriorityQueueCameraDirector
+
+> 感觉之后也会为细节面板提供赋Priority的方式，不过这个版本没有，只能先用C++写了
+
+当多个摄像机需要根据优先级竞争运行时，不需要手动写if/else切换逻辑，只需要为每个摄像机赋优先级，然后框架会自动帮你选出优先级最高的那个
+
+主要了解三个类：
+
+1. UPriorityQueueCameraDirector，只重写了OnBuildEvaluator返回对应的Evaluator，除此之外没有任何额外UPROPERTY以及函数
+2. FPriorityQueueCameraDirectorEvaluator，内部维护一个TArray<Entry>
+3. IPriorityQueueEntry接口，只有一个virtual int32 GetPriority()，给需要动态优先级的Context实现
+
+其中Entry定义在FPriorityQueueCameraDirectorEvaluator中
+
+```cpp
+struct FEntry
+{
+	// 子上下文
+	TSharedPtr<FCameraEvaluationContext> ChildContext;
+	// using FPriorityGiver = TVariant<int32, IPriorityQueueEntry*>;
+	FPriorityGiver PriorityGiver;
+	// 根据变量类型解析出实际优先级值
+	int32 GetPriority() const;
+};
+```
+
+该Director的Evaluator主要在每帧执行OnRun()
+
+1. 把Entries数组拷贝一份
+2. 按优先级升序排序
+3. 取最高优先级的Entry
+4. 获取Entry的子Context，Context的DirectorEvaluator调用Run()
+5. 如果产出Activate/Deactivate的请求，直接返回，其他低优先级的不再遍历
+
+三种使用方法：
+
+- 固定优先级：每个模式赋一个int32常量，数字越大优先级越高
+- 动态优先级：IPriorityQueueEntry接口，允许使用GetPriority()内根据游戏状态实时计算
+- 也可以混合使用：TVariant<int32, IPriorityQueueEntry>类型支持分别存储，决定每个类是否使用接口，GetPriority()可以自动识别
+
+一般混合使用，因为如果纯使用固定优先级，那就必须写逻辑手动Add或Remove，和写蓝图Evaluator没有本质区别，甚至有时候更复杂
+
+下面实现一个简单的例子，以第三人称动作游戏为例：
+
+**1. 创建CameraAsset**
+
+在编辑器中创建PriorityQueueCameraDirector，命名为`CA_PlayerCamera`，然后绑到玩家上的GameplayCameraComponent
+
+但PriorityQueue需要子Context才能工作，所以我们需要在合适的时候为其初始化子Context
+
+**2. 实现动态优先级的Context**
+
+为每个Context定义返回优先级的逻辑
+
+```cpp
+UENUM()
+enum class EMyCameraMode : uint8
+{
+	Default,// 走路
+	Aiming,// 瞄准
+	Vehicle,// 载具
+	Death,// 死亡
+};
+
+class FMyCameraContext : public UE::Cameras::FCameraEvaluationContext, public UE::Cameras::IPriorityQueueEntry
+{
+public:
+	FMyCameraContext(UGameplayCameraComponent* InComponent, UCameraAsset* InCameraAsset, EMyCameraMode InMode)
+		: FCameraEvaluationContext(InComponent)
+		, CameraAsset(InCameraAsset)
+		, Mode(InMode)
+	{}
+
+	virtual UCameraAsset* GetCameraAsset() const override
+	{
+		return CameraAsset;
+	}
+
+	virtual int32 GetPriority() override
+	{
+		AMyCharacter* Owner = GetOwnerCharacter();
+		if (!Owner) return -1;
+
+		switch (Mode)
+		{
+		case EMyCameraMode::Death:
+			return Owner->IsDead() ? 300 : -1;
+		case EMyCameraMode::Vehicle:
+			return Owner->IsInVehicle() ? 200 : -1;
+		case EMyCameraMode::Aiming:
+			return Owner->IsAiming() ? 100 : -1;
+		case EMyCameraMode::Default:
+			return 0;
+		default:
+			return -1;
+		}
+	}
+
+private:
+	AMyCharacter* GetOwnerCharacter() const
+	{
+		UGameplayCameraComponent* Comp = GetTypedOuter<UGameplayCameraComponent>();
+		if (!Comp) return nullptr;
+		return Cast<AMyCharacter>(Comp->GetOwner());
+	}
+
+	TObjectPtr<UCameraAsset> CameraAsset;
+	EMyCameraMode Mode;
+};
+```
+
+返回-1的Context无法被选中，因为其始终低于返回0的Default，相当于当前不启用
+
+> FCameraEvaluationContext不是UObject，不能直接用GetTypedOuter<AMyCharacter>()。这里通过GetTypedOuter<UGameplayCameraComponent>()拿到组件，再通过GetOwner() 获取角色
+
+**3. 初始化时一次性注册所有模式**
+
+在能拿到Evaluator的时机（如Pawn的BeginPlay或者ActivateCameraDirector事件回调）：
+
+```cpp
+void AMyCharacter::SetupPriorityQueueCamera()
+{
+	UGameplayCameraComponent* Comp = GetGameplayCameraComponent();
+	TSharedPtr<UE::Cameras::FCameraEvaluationContext> ActiveContext = Comp->GetEvaluationContext();
+	// 这里用原生C++的static_cast而不用UE提供的Cast是因为Evaluator不为UE的UObject
+	auto* Evaluator = static_cast<UE::Cameras::FPriorityQueueCameraDirectorEvaluator*>(
+		ActiveContext->GetDirectorEvaluator());
+
+	// 为每种模式创建子 Context，每个引用不同的CameraAsset
+	auto DefaultCtx = MakeShared<FMyCameraContext>(Comp, CA_Default, EMyCameraMode::Default);
+	auto AimCtx = MakeShared<FMyCameraContext>(Comp, CA_AimDownSight, EMyCameraMode::Aiming);
+	auto VehicleCtx = MakeShared<FMyCameraContext>(Comp, CA_Vehicle, EMyCameraMode::Vehicle);
+	auto DeathCtx = MakeShared<FMyCameraContext>(Comp, CA_Death, EMyCameraMode::Death);
+
+	// 全部注册
+	Evaluator->AddChildEvaluationContext(DefaultCtx, static_cast<UE::Cameras::IPriorityQueueEntry*>(DefaultCtx.Get()));
+	Evaluator->AddChildEvaluationContext(AimCtx, static_cast<UE::Cameras::IPriorityQueueEntry*>(AimCtx.Get()));
+	Evaluator->AddChildEvaluationContext(VehicleCtx, static_cast<UE::Cameras::IPriorityQueueEntry*>(VehicleCtx.Get()));
+	Evaluator->AddChildEvaluationContext(DeathCtx, static_cast<UE::Cameras::IPriorityQueueEntry*>(DeathCtx.Get()));
+}
+```
+
 ## 一些问题与思考
 
 ### 为什么设计Evaluator
