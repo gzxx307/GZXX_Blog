@@ -71,8 +71,37 @@ function _renderArticleContent(article) {
     const tagsHtml = article.tags.map(tag => `<span class="article-tag">${tag}</span>`).join('');
     // 渲染标签列表到 TOC 面板顶部
     document.getElementById('toc-tags').innerHTML = tagsHtml;
-    // 将 Markdown 内容解析为 HTML 并写入详情页容器
-    document.getElementById('article-content').innerHTML = marked.parse(article.content);
+    // 将 Markdown 中的数学公式用 HTML 注释占位符保护起来，
+    // 以免 marked 将公式内的 _ ^ 等字符误解析为 Markdown 语法（斜体、粗体等）
+    let content = article.content;
+    const mathBlocks = [];
+    const mathInlines = [];
+    // 先用占位符替换 $$...$$ 块级公式（支持跨行）
+    content = content.replace(/\$\$([\s\S]*?)\$\$/g, (_, formula) => {
+        mathBlocks.push(formula.trim());
+        return `<!--math-block-${mathBlocks.length - 1}-->`;
+    });
+    // 再用占位符替换 $...$ 行内公式（不匹配 $$，不跨行）
+    content = content.replace(/(?<!\$)\$(?!\$)([^\$\n]+?)\$(?!\$)/g, (_, formula) => {
+        mathInlines.push(formula.trim());
+        return `<!--math-inline-${mathInlines.length - 1}-->`;
+    });
+    // 将保护后的内容交给 marked 解析为 HTML
+    const articleEl = document.getElementById('article-content');
+    articleEl.innerHTML = marked.parse(content);
+    // 从高索引到低索引反向恢复公式，避免 <!--math-block-1--> 误匹配 <!--math-block-10--> 的前缀
+    for (let i = mathBlocks.length - 1; i >= 0; i--) {
+        articleEl.innerHTML = articleEl.innerHTML.replace(
+            `<!--math-block-${i}-->`,
+            katex.renderToString(mathBlocks[i], { displayMode: true })
+        );
+    }
+    for (let i = mathInlines.length - 1; i >= 0; i--) {
+        articleEl.innerHTML = articleEl.innerHTML.replace(
+            `<!--math-inline-${i}-->`,
+            katex.renderToString(mathInlines[i], { displayMode: false })
+        );
+    }
     // 对所有代码块应用 highlight.js 语法高亮
     document.querySelectorAll('#article-content pre code').forEach(block => {
         hljs.highlightElement(block);
