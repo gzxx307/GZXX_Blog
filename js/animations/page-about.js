@@ -46,8 +46,26 @@ PAGE_ANIMATIONS['page-about'] = {
         });
     },
 
-    // 退出使用默认水平滑出
+    // 退出：卡片反向交错淡出（镜像入场）
     exit(el, forward) {
-        return PAGE_ANIMATIONS['default'].exit(el, forward);
+        return new Promise(resolve => {
+            // 倒序遍历：最后入场的卡片最先退场
+            const cards = Array.from(el.querySelectorAll('.card')).reverse();
+            if (cards.length === 0) { resolve(); return; }
+
+            // 依次为每张卡片设置淡出过渡
+            cards.forEach((card, i) => {
+                const delay = i * _ABOUT_STAGGER;
+                card.style.transition = `opacity ${_ABOUT_MS}ms ease ${delay}ms`;
+                card.style.opacity = '0';
+            });
+
+            // 等待最后一张卡片动画完成后清理并 resolve
+            const total = _ABOUT_MS + (cards.length - 1) * _ABOUT_STAGGER;
+            setTimeout(() => {
+                cards.forEach(card => { card.style.cssText = ''; });
+                resolve();
+            }, total + 20);
+        });
     }
 };

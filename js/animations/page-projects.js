@@ -49,8 +49,25 @@ PAGE_ANIMATIONS['page-projects'] = {
         });
     },
 
-    // 退出使用默认水平滑出
+    // 退出：卡片反向交错缩小淡出（镜像入场）
     exit(el, forward) {
-        return PAGE_ANIMATIONS['default'].exit(el, forward);
+        return new Promise(resolve => {
+            // 倒序遍历：最后入场的卡片最先退场
+            const cards = Array.from(el.querySelectorAll('.card')).reverse();
+            if (cards.length === 0) { resolve(); return; }
+
+            // 依次为每张卡片设置缩小淡出过渡
+            cards.forEach((card, i) => {
+                const delay = i * _CAT_STAGGER;
+                card.style.transition = `transform ${_CAT_MS}ms cubic-bezier(0.4, 0, 0.2, 1) ${delay}ms,`
+                                      + `opacity ${_CAT_MS}ms ease ${delay}ms`;
+                card.style.transform = 'scale(0.88)';
+                card.style.opacity = '0';
+            });
+
+            // 等待最后一张卡片动画完成后 resolve
+            const total = _CAT_MS + (cards.length - 1) * _CAT_STAGGER;
+            setTimeout(resolve, total + 20);
+        });
     }
 };
