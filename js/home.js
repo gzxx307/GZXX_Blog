@@ -744,7 +744,7 @@ function loadWeatherCard() {
                 const { key, text } = getWeatherInfo(cur.weather_code);
                 const svgContent = WEATHER_ICONS[key];
                 content.innerHTML = `
-                    <div class="weather-card">
+                    <div class="weather-card weather--${key}">
                         <div class="weather-main">
                             <svg class="weather-svg" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">${svgContent}</svg>
                             <span class="weather-temp">${temp}°C</span>

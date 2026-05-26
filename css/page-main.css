@@ -163,6 +163,7 @@
     width: 32px;
     height: 32px;
     flex-shrink: 0;
+    overflow: visible;
 }
 
 /* 温度大字 */
@@ -236,6 +237,238 @@
     color: rgba(255, 255, 255, 0.55);
     text-align: center;
     width: 100%;
+}
+
+/* 天气图标动画通用：fill-box 使 CSS transform 按元素自身包围盒计算 */
+.weather-svg * {
+    transform-box: fill-box;
+}
+.weather-svg .sun-core,
+.weather-svg .cloud-group {
+    transform-origin: center;
+}
+
+/* ===== 晴天 ===== */
+
+/* 太阳核心：弹性缩放淡入 → 呼吸式脉动 */
+.weather--clear .sun-core {
+    animation: sun-core-enter 0.6s 0.1s cubic-bezier(0.34, 1.56, 0.64, 1) forwards,
+               sun-core-breath 3s 0.7s ease-in-out infinite;
+    opacity: 0;
+}
+/* 光线：从远离中心处收回 + 淡入，每条错开 0.05s */
+.weather--clear .sun-ray {
+    animation: sun-ray-enter 0.4s var(--sr-delay, 0s) ease-out forwards;
+    opacity: 0;
+}
+.weather--clear .sun-ray:nth-child(1) { --sr-delay: 0s; }
+.weather--clear .sun-ray:nth-child(2) { --sr-delay: 0.05s; }
+.weather--clear .sun-ray:nth-child(3) { --sr-delay: 0.1s; }
+.weather--clear .sun-ray:nth-child(4) { --sr-delay: 0.15s; }
+.weather--clear .sun-ray:nth-child(5) { --sr-delay: 0.2s; }
+.weather--clear .sun-ray:nth-child(6) { --sr-delay: 0.25s; }
+.weather--clear .sun-ray:nth-child(7) { --sr-delay: 0.3s; }
+.weather--clear .sun-ray:nth-child(8) { --sr-delay: 0.35s; }
+/* 光线组：缓慢旋转，原点 (12,12) 即太阳圆心
+   transform-box: view-box 使像素值相对于 SVG viewBox，避免 fill-box 被包围盒偏移 */
+.weather--clear .sun-rays {
+    transform-box: view-box;
+    transform-origin: 12px 12px;
+    animation: sun-rays-spin 30s 0.7s linear infinite;
+}
+
+@keyframes sun-core-enter {
+    0% { opacity: 0; transform: scale(0.7); }
+    70% { opacity: 1; transform: scale(1.05); }
+    100% { opacity: 1; transform: scale(1); }
+}
+@keyframes sun-core-breath {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.03); }
+}
+@keyframes sun-ray-enter {
+    0% { opacity: 0; transform: scale(1.4); }
+    100% { opacity: 1; transform: scale(1); }
+}
+@keyframes sun-rays-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* ===== 晴间多云 ===== */
+
+/* 小太阳核心：弹性缩放淡入 → 呼吸脉动 */
+.weather--partlyCloudy .sun-core {
+    animation: sun-core-enter 0.4s 0.05s cubic-bezier(0.34, 1.56, 0.64, 1) forwards,
+               sun-core-breath 3.5s 0.45s ease-in-out infinite;
+    opacity: 0;
+}
+/* 光线：从太阳中心向外收回 + 淡入，仅入场无待机 */
+.weather--partlyCloudy .sun-ray {
+    transform-box: view-box;
+    transform-origin: 20px 5px;
+    animation: sun-ray-enter 0.35s var(--pc-sr-delay, 0s) ease-out forwards;
+    opacity: 0;
+}
+.weather--partlyCloudy .sun-ray:nth-child(2) { --pc-sr-delay: 0s; }
+.weather--partlyCloudy .sun-ray:nth-child(3) { --pc-sr-delay: 0.05s; }
+.weather--partlyCloudy .sun-ray:nth-child(4) { --pc-sr-delay: 0.1s; }
+/* 云朵：淡入 + 从右飘入 */
+.weather--partlyCloudy .cloud-group {
+    animation: cloud-enter 0.5s 0.1s ease-out forwards,
+               cloud-drift 4s 0.6s ease-in-out infinite;
+    opacity: 0;
+}
+
+@keyframes cloud-enter {
+    0% { opacity: 0; transform: translateX(6px); }
+    100% { opacity: 1; transform: translateX(0); }
+}
+@keyframes cloud-drift {
+    0%, 100% { transform: translateX(0); }
+    50% { transform: translateX(1.5px); }
+}
+
+/* ===== 阴天 ===== */
+
+/* 仅云朵入场 + 漂移 */
+.weather--cloudy .cloud-group {
+    animation: cloud-enter 0.5s ease-out forwards,
+               cloud-drift 4s 0.5s ease-in-out infinite;
+    opacity: 0;
+}
+
+/* ===== 雾 ===== */
+
+/* 三条横线依次淡入 + 水平滑入，待机同步水平微移，幅度对齐云朵 */
+.weather--fog .fog-line {
+    animation: fog-line-enter 0.4s var(--fog-e-delay, 0s) ease-out forwards,
+               fog-line-idle 4s 0.7s ease-in-out infinite;
+    opacity: 0;
+}
+.weather--fog .fog-line:nth-child(1) { --fog-e-delay: 0s; }
+.weather--fog .fog-line:nth-child(2) { --fog-e-delay: 0.1s; }
+.weather--fog .fog-line:nth-child(3) { --fog-e-delay: 0.2s; }
+
+@keyframes fog-line-enter {
+    0% { opacity: 0; transform: translateX(-4px); }
+    100% { opacity: 1; transform: translateX(0); }
+}
+@keyframes fog-line-idle {
+    0% { transform: translateX(-1.5px); }
+    50% { transform: translateX(1.5px); }
+    100% { transform: translateX(-1.5px); }
+}
+
+/* ===== 毛毛雨 ===== */
+
+/* 云朵仅淡入，不漂移 */
+.weather--drizzle .cloud-group {
+    animation: cloud-fade-in 0.3s ease-out forwards;
+    opacity: 0;
+}
+/* 雨滴：由上淡入向下淡出，循环 1.5s，两滴错开 */
+.weather--drizzle .raindrop {
+    animation: raindrop-fall-drizzle 1.5s linear infinite;
+    opacity: 0;
+}
+.weather--drizzle .raindrop:nth-child(2) { animation-delay: 0s; }
+.weather--drizzle .raindrop:nth-child(3) { animation-delay: 0.5s; }
+
+@keyframes cloud-fade-in {
+    0% { opacity: 0; }
+    100% { opacity: 1; }
+}
+@keyframes raindrop-fall-drizzle {
+    0% { opacity: 0; transform: translateY(-4px); }
+    25% { opacity: 1; transform: translateY(1px); }
+    60% { opacity: 1; transform: translateY(5px); }
+    90% { opacity: 0.3; transform: translateY(7px); }
+    100% { opacity: 0; transform: translateY(8px); }
+}
+
+/* ===== 雨 ===== */
+
+/* 云朵仅淡入，不漂移 */
+.weather--rain .cloud-group {
+    animation: cloud-fade-in 0.3s ease-out forwards;
+    opacity: 0;
+}
+/* 雨滴：同毛毛雨但更快（1.2s），三滴错开 */
+.weather--rain .raindrop {
+    animation: raindrop-fall-rain 1.2s linear infinite;
+    opacity: 0;
+}
+.weather--rain .raindrop:nth-child(2) { animation-delay: 0s; }
+.weather--rain .raindrop:nth-child(3) { animation-delay: 0.4s; }
+.weather--rain .raindrop:nth-child(4) { animation-delay: 0.8s; }
+
+@keyframes raindrop-fall-rain {
+    0% { opacity: 0; transform: translateY(-4px); }
+    20% { opacity: 1; transform: translateY(1px); }
+    50% { opacity: 1; transform: translateY(5px); }
+    85% { opacity: 0.3; transform: translateY(7px); }
+    100% { opacity: 0; transform: translateY(8px); }
+}
+
+/* ===== 雪 ===== */
+
+/* 云朵仅淡入，不漂移 */
+.weather--snow .cloud-group {
+    animation: cloud-fade-in 0.3s ease-out forwards;
+    opacity: 0;
+}
+/* 雪花：旋转缩放入场 → 持续旋转，两片错开 */
+.weather--snow .snowflake {
+    animation: snowflake-enter 0.6s var(--sf-e-delay, 0s) ease-out forwards,
+               snowflake-spin 8s var(--sf-i-delay, 0.6s) linear infinite;
+    opacity: 0;
+}
+.weather--snow .sf-1 { transform-box: view-box; transform-origin: 8px 20px; --sf-e-delay: 0s; --sf-i-delay: 0.6s; }
+.weather--snow .sf-2 { transform-box: view-box; transform-origin: 16px 21px; --sf-e-delay: 0.15s; --sf-i-delay: 0.75s; }
+
+@keyframes snowflake-enter {
+    0% { opacity: 0; transform: rotate(-90deg) scale(0.3); }
+    100% { opacity: 1; transform: rotate(0deg) scale(1); }
+}
+@keyframes snowflake-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* ===== 雷暴 ===== */
+
+/* 云朵淡入 + 脉冲 */
+.weather--thunderstorm .cloud-group {
+    animation: cloud-fade-in 0.3s ease-out forwards,
+               cloud-pulse 4s 0.3s ease-in-out infinite;
+    opacity: 0;
+}
+/* 闪电：入场快闪两次，结束后保持显示，待机持续闪烁 */
+.weather--thunderstorm .lightning {
+    animation: lightning-enter 0.5s ease-out forwards,
+               lightning-idle 6s 0.5s step-start infinite;
+    opacity: 0;
+}
+
+@keyframes cloud-pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.02); }
+}
+@keyframes lightning-enter {
+    0% { opacity: 0; }
+    15% { opacity: 1; }
+    30% { opacity: 0; }
+    60% { opacity: 0.7; }
+    70% { opacity: 1; }
+    100% { opacity: 1; }
+}
+@keyframes lightning-idle {
+    0%, 60% { opacity: 1; }
+    60.5%, 61% { opacity: 0.2; }
+    61.5%, 62% { opacity: 1; }
+    80%, 80.5% { opacity: 0.15; }
+    81%, 100% { opacity: 1; }
 }
 
 /* 最新文章 / 随机推荐卡片：填满内容区，纵向弹性排列，左对齐 */
