@@ -224,7 +224,7 @@ Evaluator中定义了该Director切换CameraRig的逻辑
 
 ### State Tree
 
-
+> State Tree官方还没完善，要使用的话需要维护很多节点间关系，而且也比较复杂难看懂，各方面都不如Blueprint，这里不介绍
 
 ### Camera Rig
 
