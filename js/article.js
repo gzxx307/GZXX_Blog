@@ -10,6 +10,8 @@ let filteredArticles = ARTICLES_DATA.slice();
 let isArticleAnimating = false;
 // 当前选中的标签，null 表示未选中
 let selectedTag = null;
+// 文章内部锚点链接点击事件是否已绑定（委托在 #article-content 上，只需绑定一次）
+let _articleInternalLinksBound = false;
 
 // 当过滤结果为空时，显示默认提示信息
 function showNoResults() {
@@ -106,9 +108,10 @@ function _renderArticleContent(article) {
     document.querySelectorAll('#article-content pre code').forEach(block => {
         hljs.highlightElement(block);
     });
-    // 内容写入后立即初始化目录与灯箱
+    // 内容写入后立即初始化目录、灯箱与内部锚点链接
     initToc();
     initLightbox();
+    initArticleInternalLinks();
 
     // 构建可导航文章列表（排除 about_me.md）
     const navList = ARTICLES_DATA.filter(a => a.file !== 'about_me.md');
@@ -159,6 +162,44 @@ function openArticle(article) {
     // 地址栏会错误地变成 #/article/ 而非 #/article/docker
     _currentArticleSlug = article.file.replace('.md', '');
     navigateTo('page-article-detail');
+}
+
+// 为文章内容中的内部锚点链接（href="#xxx"）绑定平滑滚动点击委托
+// 仅需绑定一次：事件委托在 #article-content 上，innerHTML 替换不影响委托
+function initArticleInternalLinks() {
+    if (_articleInternalLinksBound) return;
+    _articleInternalLinksBound = true;
+
+    // 使用 querySelector 精确选中文章详情页内的 #article-content，避免与关于页面的重复 id 冲突
+    const content = document.querySelector('#page-article-detail #article-content');
+    if (!content) return;
+
+    content.addEventListener('click', (e) => {
+        // 找到最近的符合内部锚点特征的 <a> 标签
+        const link = e.target.closest('a[href^="#"]');
+        if (!link) return;
+        const href = link.getAttribute('href');
+        // 跳过路由 hash（#/xxx）和空锚点
+        if (!href || href === '#' || href.startsWith('#/')) return;
+
+        e.preventDefault();
+        const targetId = decodeURIComponent(href.slice(1));
+        // toc.js 的 _buildToc() 会将标题 id 改为 <slug>-<index> 格式，
+        // 但文章内 markdown 链接仍指向原始 id，因此需要两级查找：
+        // 先精确匹配，失败后再按 toc.js 添加的后缀模式（targetId-数字）前缀匹配
+        let targetEl = document.getElementById(targetId);
+        if (!targetEl) {
+            targetEl = document.querySelector('[id^="' + CSS.escape(targetId) + '-"]');
+        }
+        if (!targetEl) return;
+
+        // 在文章详情页的滚动容器内平滑滚动到目标元素
+        const scrollEl = document.getElementById('page-article-detail');
+        const containerTop = scrollEl.getBoundingClientRect().top;
+        const targetTop = targetEl.getBoundingClientRect().top;
+        const targetScrollTop = scrollEl.scrollTop + (targetTop - containerTop) - 80;
+        _smoothScrollTo(scrollEl, targetScrollTop, 500);
+    });
 }
 
 // 根据 slug 恢复文章内容与 slug 状态，返回是否找到文章

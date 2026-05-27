@@ -150,6 +150,11 @@ window.addEventListener('hashchange', () => {
         return;
     }
 
+    // 非路由 hash（不以 #/ 开头）是文章内部锚点链接（如 #section-heading），
+    // 不触发页面切换，由 article.js 中的点击委托接管平滑滚动
+    const rawHash = window.location.hash;
+    if (rawHash && !rawHash.startsWith('#/')) return;
+
     const { pageId, articleSlug } = _parseHash();
 
     if (pageId === 'page-article-detail' && articleSlug) {
