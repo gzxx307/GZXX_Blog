@@ -1,0 +1,73 @@
+# 项目标签配置
+# 使用 gh label 命令或 github-label-sync 工具同步到仓库
+# 同步命令：gh label clone gzxx307/GZXX_Blog --force（从该仓库克隆标签）
+# 或使用此文件手动管理，运行 npx github-label-sync gzxx307/GZXX_Blog
+
+# 问题类型
+- name: bug
+  color: d73a4a
+  description: 确认存在的缺陷或错误
+
+- name: enhancement
+  color: a2eeef
+  description: 新功能或功能改进请求
+
+- name: documentation
+  color: 0075ca
+  description: 文档相关的改进或补充
+
+- name: question
+  color: d876e3
+  description: 使用上的疑问或需要更多信息
+
+# 优先级
+- name: good first issue
+  color: 7057ff
+  description: 适合初次贡献者上手的问题
+
+- name: help wanted
+  color: 008672
+  description: 需要额外帮助或社区贡献
+
+- name: high priority
+  color: b60205
+  description: 需要优先处理的问题
+
+- name: low priority
+  color: 0e8a16
+  description: 可以稍后处理的问题
+
+- name: need more info
+  color: 5319e7
+  description: 需要更多信息才能处理的问题
+
+# 状态
+- name: wontfix
+  color: ffffff
+  description: 已确认但暂不计划修复
+
+- name: duplicate
+  color: cfd3d7
+  description: 与已有 issue 重复
+
+- name: invalid
+  color: e4e669
+  description: 不属于本项目的 issue 或无法复现
+
+# 分类
+- name: design
+  color: f9d0c4
+  description: UI / UX 相关的设计问题
+
+- name: performance
+  color: bfdadc
+  description: 性能相关的优化
+
+# 草台班子
+- name: not a bug
+  color: 000000
+  description: 你在干什么
+
+- name: not clear enough
+  color: a4e597
+  description: 看来我们需要更显眼的提示

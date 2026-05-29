@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 项目文档
+    url: https://github.com/gzxx307/GZXX_Blog#readme
+    about: 提交 issue 前请先阅读 README，确认使用方法是否正确。
+  - name: 在线演示
+    url: https://gzxx307.github.io/GZXX_Blog
+    about: 访问在线博客查看实际运行效果。

@@ -3,7 +3,12 @@
 
 #/data
 
+
+# agent相关文件
 CLAUDE.md
 .claude/
 docs/superpowers/
 .superpowers/
+
+# 因为调试别的项目产生的文件夹
+articles/notes/
