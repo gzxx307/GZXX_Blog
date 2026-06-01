@@ -11,6 +11,7 @@
     <link rel="stylesheet" href="css/toc.css?v=d08d49d">
     <link rel="stylesheet" href="css/lightbox.css?v=d08d49d">
     <link rel="stylesheet" href="css/page-main.css?v=d08d49d">
+    <link rel="stylesheet" href="css/page-friends.css?v=d08d49d">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11.11.1/styles/atom-one-dark.min.css">
@@ -26,6 +27,7 @@
                 <li><a href="#" data-page="page-article">文章</a></li>
                 <li><a href="#" data-page="page-projects">作品</a></li>
                 <li><a href="#" data-page="page-about">关于</a></li>
+                <li><a href="#" data-page="page-friends">友链</a></li>
             </ul>
         </div>
     </nav>
@@ -85,12 +87,19 @@
                 </div>
             </main>
         </section>
+
+        <section id="page-friends" class="page">
+            <main>
+                <div id="friends-list" class="friends-list"></div>
+            </main>
+        </section>
     </div>
 
     <script src="js/bg-effect.js?v=d08d49d"></script>
     <script src="data/articles_data.js?v=d08d49d"></script>
     <script src="data/play_list.js?v=d08d49d"></script>
     <script src="data/profile.js?v=d08d49d"></script>
+    <script src="data/friends.js?v=d08d49d"></script>
     <script src="js/animations/registry.js?v=d08d49d"></script>
     <script src="js/animations/default.js?v=d08d49d"></script>
     <script src="js/animations/page-main.js?v=d08d49d"></script>
@@ -98,9 +107,11 @@
     <script src="js/animations/page-article-detail.js?v=d08d49d"></script>
     <script src="js/animations/page-projects.js?v=d08d49d"></script>
     <script src="js/animations/page-about.js?v=d08d49d"></script>
+    <script src="js/animations/page-friends.js?v=d08d49d"></script>
     <script src="js/weather-icons.js?v=d08d49d"></script>
     <script src="js/home.js?v=d08d49d"></script>
     <script src="js/about.js?v=d08d49d"></script>
+    <script src="js/friends.js?v=d08d49d"></script>
     <!-- TOC 容器置于 body 末尾，脱离 .page 的 transform 影响，使 fixed 定位相对视口生效 -->
     <div id="toc-container" style="display:none">
         <div id="toc-panel">

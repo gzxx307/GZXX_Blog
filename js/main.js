@@ -31,6 +31,8 @@ document.getElementById('tag-filter-btn').addEventListener('click', () => {
 loadArticleList();
 // 加载关于页面
 loadAboutPage();
+// 加载友链页面
+loadFriendsPage();
 
 // 解析初始 hash，决定首屏显示哪个页面
 const _initRoute = _parseHash();

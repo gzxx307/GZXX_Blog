@@ -3,7 +3,7 @@
  */
 
 // 页面顺序定义，决定切换方向（靠后 = 向右/前进，靠前 = 向左/后退）
-const PAGE_ORDER = ['page-main', 'page-article', 'page-article-detail', 'page-projects', 'page-about'];
+const PAGE_ORDER = ['page-main', 'page-article', 'page-article-detail', 'page-projects', 'page-about', 'page-friends'];
 
 // 动画锁：为 true 时忽略新的导航请求，防止动画叠加
 let isAnimating = false;
@@ -21,7 +21,8 @@ const _PAGE_HASH = {
     'page-main':     '/',
     'page-article':  '/article',
     'page-projects': '/projects',
-    'page-about':    '/about'
+    'page-about':    '/about',
+    'page-friends':  '/friends'
 };
 
 // 根据页面 ID 构建完整 hash 路径字符串
@@ -52,6 +53,7 @@ function _parseHash() {
     if (path.startsWith('/article/'))          return { pageId: 'page-article-detail',  articleSlug: path.slice('/article/'.length) };
     if (path === '/projects')                  return { pageId: 'page-projects',        articleSlug: null };
     if (path === '/about')                     return { pageId: 'page-about',           articleSlug: null };
+    if (path === '/friends')                   return { pageId: 'page-friends',         articleSlug: null };
     return { pageId: 'page-main', articleSlug: null };
 }
 
