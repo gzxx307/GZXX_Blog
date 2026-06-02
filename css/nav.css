@@ -42,6 +42,11 @@
     text-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
 }
 
+/* 导航链接列表容器：作为指示条的定位参照 */
+.nav-links-wrapper {
+    position: relative;
+}
+
 /* 导航链接列表：水平排列，去除列表样式 */
 .nav-links {
     list-style: none;
@@ -61,4 +66,20 @@
 /* 鼠标悬停时高亮链接颜色 */
 .nav-links a:hover {
     color: #54e0b4;
+}
+
+/* 当前激活页面链接：文字保持绿色 */
+.nav-links a.active {
+    color: #54e0b4;
+}
+
+/* 导航指示条：绝对定位于 .nav-links-wrapper 底部，随页面切换滑动 */
+.nav-indicator {
+    position: absolute;
+    bottom: -6px;
+    height: 3px;
+    border-radius: 2px;
+    background-color: #54e0b4;
+    opacity: 0;
+    transition: opacity 0.15s ease;
 }

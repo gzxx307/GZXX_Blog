@@ -98,12 +98,21 @@ function navigateTo(targetId, silent = false) {
             const tocPanel = document.getElementById('toc-panel');
             if (tocPanel) tocPanel.style.opacity = '';
         }
+        // 静默切换时直接更新指示条位置，不播放动画
+        if (typeof updateNavIndicator === 'function') {
+            updateNavIndicator(targetId, false);
+        }
         return;
     }
 
     // 根据 PAGE_ORDER 中的位置判断前进还是后退
     const forward = PAGE_ORDER.indexOf(targetId) > PAGE_ORDER.indexOf(current.id);
     isAnimating = true;
+
+    // 导航开始时立即更新指示条（播放伸缩动画），独立于页面动画
+    if (typeof updateNavIndicator === 'function') {
+        updateNavIndicator(targetId);
+    }
 
     _getExit(current.id)(current, forward).then(() => {
         current.classList.remove('active');

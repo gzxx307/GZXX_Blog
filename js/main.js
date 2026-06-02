@@ -40,6 +40,10 @@ const _initRoute = _parseHash();
 if (_initRoute.pageId === 'page-main') {
     // 无 hash 或主页：播放主页入场动画（原有行为）
     PAGE_ANIMATIONS['page-main'].enter(document.getElementById('page-main'), true);
+    // 主页无对应导航链接，标记指示条状态即可
+    if (typeof updateNavIndicator === 'function') {
+        updateNavIndicator('page-main', false);
+    }
 } else if (_initRoute.pageId === 'page-article-detail' && _initRoute.articleSlug) {
     // 文章详情：先渲染文章，再静默切换到详情页
     const found = restoreArticle(_initRoute.articleSlug);
@@ -48,3 +52,11 @@ if (_initRoute.pageId === 'page-main') {
     // 其他页面（文章列表、作品、关于）：静默切换，不播放主页动画
     navigateTo(_initRoute.pageId, true);
 }
+
+// 窗口缩放时重新计算指示条位置
+window.addEventListener('resize', () => {
+    const active = document.querySelector('.page.active');
+    if (active && typeof updateNavIndicator === 'function') {
+        updateNavIndicator(active.id, false);
+    }
+});

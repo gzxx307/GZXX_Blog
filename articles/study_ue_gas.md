@@ -136,3 +136,15 @@ public:
 };
 ```
 
+### Gameplay Ability
+
+Gameplay Ability定义了一个对象（Actor）可以做的行为或技能，能力可以是普通攻击或者吟唱技能，可以是角色被击飞倒地，还可以是使用某种道具，交互某个物件，甚至跳跃、飞行等角色行为，只要是角色做出的行为都可以成为Ability
+
+Ability可以被赋予对象或从对象的ASC中移除，对象同时可以激活多个GameplayAbility
+
+**角色需要拥有GA，才能使用GA**
+
+给角色添加GA用AbilitySystemComponent的GiveAbility函数（或者节点），指定一个Ability Class添加
+
+释放GA的方式则有两种，一种是根据类直接触发，一种则是通过Tag触发（这样会激活所有该Tag的GA）
+
