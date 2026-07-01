@@ -13,7 +13,7 @@ GAS系统最初是为堡垒之夜设计的，之后被收录为UE主体的框架
 > 本文基于UE5.7，每个UE版本的代码可能都会不太一样，但是框架应该大差不差
 
 > 参考文章或文献：
->
+> 
 > [https://github.com/BillEliot/GASDocumentation_Chinese](https://github.com/BillEliot/GASDocumentation_Chinese)（一个为UE4写的笔记，已经四年没更新了，可以看看作为参考，如果想看UE5的GAS，可以看[https://github.com/tranek/GASDocumentation](https://github.com/tranek/GASDocumentation)，可惜这是英文版的，而且也很久没更新了）
 >
 > [官方文档](https://dev.epicgames.com/documentation/unreal-engine/gameplay-ability-system-for-unreal-engine)
@@ -144,7 +144,141 @@ Ability可以被赋予对象或从对象的ASC中移除，对象同时可以激�
 
 **角色需要拥有GA，才能使用GA**
 
-给角色添加GA用AbilitySystemComponent的GiveAbility函数（或者节点），指定一个Ability Class添加
+给角色添加GA使用AbilitySystemComponent提供的GiveAbility函数（或者节点），指定一个Ability Class添加
 
 释放GA的方式则有两种，一种是根据类直接触发，一种则是通过Tag触发（这样会激活所有该Tag的GA）
 
+GA的启用分为实例化和释放两个过程，前者主要是生成一个FGameplayAbilitySpec对象，并为一部分非公有（非静态）属性赋值，如当前GA的等级。后者操作的实际对象则为Spec
+
+GA的实例化策略决定了当GameplayAbility激活时是否和如何实例化，具体有三种实例化策略：
+
+|实例化策略|描述|例子|
+|---|---|---|
+|按Actor实例化(Instanced Per Actor)|每个ASC只能有一个在激活之前复用的GameplayAbility实例|这可能是你使用最频繁的实例化策略. 你可以对任一Ability使用并在激活之间提供持久化. 设计者可以在激活之间手动重设任意变量|
+|按操作实例化(Instanced Per Execution)|每有一个GameplayAbility激活，就有一个新的GameplayAbility实例创建|这些GameplayAbility的好处是每次激活时变量都会重置，其性能要比Instanced Per Actor差，因为每次激活时都会生成新的GameplayAbility|
+|非实例化(Non-Instanced)|GameplayAbility操作其ClassDefaultObject，没有实例创建|它是三种方式中性能最好的，但是使用它是最受限制的。非实例化(Non-Instanced)GameplayAbility不能存储状态，这意味着没有动态变量和不能绑定到AbilityTask委托。使用它的最佳场景就是需要频繁使用的简单Ability, 像MOBA或RTS游戏中小兵的基础攻击。如果在非实例化中创建变量并修改，那么改变量会应用的所有的该GA上，并且重开游戏还能读取到该变量|
+
+### Ability Task
+
+GameplayAbility只能在一帧中开始执行，也就是说其触发是瞬时的，对于那些需要进行吟唱或前摇的技能，GameplayAbility并不能提供太多的灵活性，为了为了实现随时间推移而触发或响应一段时间后触发的委托操作，我们需要使用AbilityTask
+
+AbilityTask本质上是一个异步操作，调用PlayMontageAndWait函数返回一个AsyncTask，如果想要手动取消该AbilityTask，则直接调用Task的成员函数EndTask即可
+
+GAS系统自带了许多AbilityTask，详情参考UE文档。如果需要自己写AbilityTask，则需要使用C++
+
+> UAbilityTask的构造函数中硬编码了其最多允许1000个AbilityTask同时运行，设计那些同时拥有数百个Character的游戏的GameplayAbility时要注意这一点
+
+### Gameplay Effect
+
+GameplayEffect是GameplayAbility对自己或他人产生影响的途径，GameplayAbility通过施加GameplayEffect来修改AttributeSet
+
+其中包含例如游戏中的Buff，提供增益/减益效果，或者更广义的，伤害结算、施加控制、霸体效果都可以通过GameplayEffect实现
+
+**Gameplay Effect是修改Attribute的唯一途径**
+
+下面是使用GameplayEffect会涉及到的几个类
+
+#### UGameplayEffect
+
+UGameplayEffect相当于一个可配置的数据表，但不在其中配置具体的数值，而是配置与GameplayEffect相关的一些模式
+
+**如何使用UGameplayEffect**
+
+首先，其仅起到一个配置的作用，一般的蓝图类的生命周期函数在该类中均为虚函数，这意味着你无法继承其生命周期函数。UE这么设计是因为其不希望用户在图标中写入逻辑。所以通常不在继承了UGameplayEffect的蓝图类中写入逻辑。
+
+> 源码中写道"This is only blueprintable to allow for templating gameplay effects. Gameplay effects should NOT contain blueprint graphs."
+
+另外，UGameplayEffect一般也无需在C++中进行继承
+
+要使用UGameplayEffect，首先创建继承自UGameplayEffect的蓝图类，并在该类中配置你期望的内容
+
+在类默认值中，你可以设置：
+
+##### 持续时间
+
+设置该GE的持续时间，分为实时（瞬间作用）、无限（无限时长）、拥有持续时间。
+
+"无限"和"拥有持续时间"还包含一个属性："周期"。其表示一个Modifier触发的计时器，例如周期为5时Modifier每5秒触发一次。而当周期为0时，Modifier只触发一次（Modifier下面讲）
+
+"拥有持续时间"有其"持续时间"和"最大持续时间"，幅度计算类型表示的时该数值的计算方式：
+
+1. 可扩展浮点：数值为硬编码浮点数，且该浮点数可以通过曲线来修改。例如定义该效果为回复HP50点，其对应曲线上的一个点，当角色技能升级时，曲线x轴右移，那么该效果回复的HP会更多（相当于映射的作用）。
+2. 属性基础：基于某个属性计算数值。计算公式为：
+   $$
+    (Coefficient × (PreMultiplyAdditiveValue + 属性值)) + PostMultiplyAdditive
+   $$
+   - "支持属性"指的是公式中"属性值"的来源，选择某一Attribute以及Attribute的值是来源于施加GameplayEffect的对象还是被施加的对象。
+   - "属性曲线"即取到属性值后进行映射覆盖原属性。"属性计算类型"分为三个：
+     1. 属性幅度：以该属性的最终值作为支持属性
+     2. 属性基值：以该属性的基础值作为支持属性
+     3. 属性加成幅度：相当于FinalValue-BaseValue
+3. 自定义计算类：使用自定义的计算方式计算值（用到的是"计算类"，后面讲）。但UE还保留了"预乘加值"和"后乘加值"。其公式为：
+   $$
+    (Coefficient × (PreMultiplyAdditiveValue + 计算类输出)) + PostMultiplyAdditive
+   $$
+   然后再根据曲线进行映射得出最终值
+4. 由调用者设置：调用前先设定，然后再进行调用。
+
+##### 组件
+
+组件为GE提供除数值以外的其他功能，例如为Actor赋予或移除标签、在此效果后额外附加效果、移除其他效果、赋予能力等
+
+##### 修饰符
+
+修饰符为GE提供数值相关的功能，例如修改被施加GE者的Attribute
+
+其中修改器操作有六种：
+
+1. 添加（基础）：多个AddBase先求和，然后与BaseValue相加
+2. 乘法（加法）：多个MultiplyAdditive先求和，然后乘到上一步结果上
+   > 注意：编辑器中填入的数值应为期望添加的百分比+1，例如希望攻击力加50%，那么填入1.5，两个1.5等价为2.0（即50%+50%=100%）
+3. 除法（加法）：多个DivideAdditive先求和，然后除到上一步结果上
+   > 注意：多个Divide叠加的最终结果为求和后-1，例如希望攻击力减50%，则填入2.0，两个2.0等价为3.0（即2.0+2.0-1=3.0）
+4. 乘法（复合）：多个MultiplyCompound先求乘积，然后再乘到上一步结果上，例如暴击*属性克制
+5. 添加（最终）：多个AddFinal先求和，然后加到上面的步骤的最终结果上
+6. 重载：不理任何前置公式1，直接将最终值改成指定值，例如无敌状态将伤害改为0
+
+最终公式为（同级同类值先聚合，再代入公式）：
+
+$$
+((BaseValue + AddBase) * MultiplyAdditive / DivideAdditive * MultiplyCompound) + AddFinal
+$$
+
+##### 执行
+
+执行是一个额外的脚本，定位为该GE生效时执行的一次性的复杂脚本，可以在该脚本中完全自定义C++/蓝图计算
+
+条件GE指的是在Execution执行成功后对同一目标应用的GE
+
+#### UGameplayEffectExecutionCalculation
+
+即上文中提到的"计算类"，其捕获Attribute，执行计算逻辑，最后返回处理后的值
+
+> 现阶段的该类似乎几乎没有为蓝图暴露函数，导致该类定义的工具函数、Execution函数的ExecutionParams入参和OutExecutionOutput出参，对蓝图均不透明，这导致纯蓝图实际上是不可用的。如果你仍然希望通过蓝图来定义计算逻辑，可以先继承该类，并为蓝图暴露一些函数以获取和输出数值
+> 
+> 关于C++原生继承的部分可以看[知乎的一个帖子](https://zhuanlan.zhihu.com/p/1963398821410236165)，因为比较复杂这里先不详细写了，之后有时间在复习的时候再写
+
+#### Gameplay Cues
+
+抑制堆叠提示指的是：同一个GE堆叠时，是否抑制后面的GE触发Cue，如果勾选则只有第一层触发Cue而后续不触发；不勾选则每次都会触发
+
+其中的GameplayCues数组的"幅度属性"指的是指定用来判断效果是否应用的数值，最低等级与最高等级限定了触发的条件范围。例如Attribute为造成伤害，等级0-10播放一种声音，10-20则播放另一种声音
+
+配置什么效果播放则使用Gameplay提示标签配置，系统根据相应的标签寻找已注册的GameplayCue
+
+#### 堆叠
+
+堆叠样式指的是当该GE多次由同一目标触发或者对同一目标触发多次时的叠层方式。
+
+- No Stacking：即不堆叠，产生两个相同的独立的GE，例如火球术攻击到同一目标时创建相同的GE
+- Stack Per Source：当该GE的来源多次释放相同GE时叠层，例如一个牧师重复释放三次光环时力量翻三倍
+- Stack Per Target：当该GE的拥有者多次被施加相同GE时叠层，例如三个法师都对敌人释放点燃则点燃叠三层
+
+其中Stack Per Target和Stack Per Target模式下有几个可配置项：
+
+- 堆栈限制计数：最大叠层，该值为0或-1时表示无上限
+- 堆栈持续时间刷新策略，其中有一个枚举项为"Extand Duration"，即将持续时间叠加
+- 堆栈周期重设策略，顾名思义
+- 堆栈计数系数为一bool值，为true时表示Modifier的计算结果自动乘以StackCount，为false时则不影响数值。例如中毒效果每秒10点伤害，如果堆栈计数系数为true，则3层中毒时每秒10*3=30点伤害
+- 溢出描述了满层后如何进行处理，可以选择触发额外的GE
+  - 拒绝溢出应用表示满层后再次尝试施加GE时会拒绝施加
