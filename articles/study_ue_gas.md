@@ -18,6 +18,9 @@ GAS系统最初是为堡垒之夜设计的，之后被收录为UE主体的框架
 >
 > [官方文档](https://dev.epicgames.com/documentation/unreal-engine/gameplay-ability-system-for-unreal-engine)
 
+> [!caution] 注意
+> 由于GAS系统本身与C++较为绑定，且其对蓝图的适配也不是很好（有很多内容没有暴露给蓝图），所以建议在有C++基础的前提下学习该系统
+
 ## 为什么选择GAS
 
 为了在游戏开发的过程中能够清晰方便的管理角色的技能、效果、判定、属性等等的内容，如果我们没有一套明文清晰的框架，代码写到后面就只会变成依托答辩。在Unity中，Unity官方并没有提供这样一套系统，官方层面上是完全空白的，如果你希望有一套自己的技能框架，则需要自己写，而第三方库的方案就比较零散，没有一个统一的标准，导致每次都需要接受一套新的规则。但是UE官方则主动将这样一套系统开放（特别是源码开源，伟大的开源精神这一块）
@@ -250,6 +253,34 @@ $$
 
 条件GE指的是在Execution执行成功后对同一目标应用的GE
 
+##### Gameplay Cues
+
+抑制堆叠提示指的是：同一个GE堆叠时，是否抑制后面的GE触发Cue，如果勾选则只有第一层触发Cue而后续不触发；不勾选则每次都会触发
+
+其中的GameplayCues数组的"幅度属性"指的是作为额外参数传给Cue，让Cue根据数值大小调整表现强度，例如大数字=大特效，最小值和最大值则代表将其中的值映射为0-1归一化后再传入Cue
+
+配置什么效果播放则使用Gameplay提示标签配置，系统根据相应的标签寻找已注册的GameplayCue
+
+##### 堆叠
+
+堆叠样式指的是当该GE多次由同一目标触发或者对同一目标触发多次时的叠层方式。
+
+> 这一部分源码中已经标记了弃用，但是不知道为什么蓝图里还有显示，也不知道到底有没有作用
+
+- No Stacking：即不堆叠，产生两个相同的独立的GE，例如火球术攻击到同一目标时创建相同的GE
+- Stack Per Source：当该GE的来源多次释放相同GE时叠层，例如一个牧师重复释放三次光环时力量翻三倍
+- Stack Per Target：当该GE的拥有者多次被施加相同GE时叠层，例如三个法师都对敌人释放点燃则点燃叠三层
+
+其中Stack Per Source和Stack Per Target模式下有几个可配置项：
+
+- 堆栈限制计数：最大叠层，该值为0或-1时表示无上限
+- 堆栈持续时间刷新策略，其中有一个枚举项为"Extand Duration"，即将持续时间叠加
+- 堆栈周期重设策略，顾名思义
+- 堆栈计数系数为一bool值，为true时表示Modifier的计算结果自动乘以StackCount，为false时则不影响数值。例如中毒效果每秒10点伤害，如果堆栈计数系数为true，则3层中毒时每秒10*3=30点伤害
+- 溢出描述了满层后如何进行处理，可以选择触发额外的GE
+  - 拒绝溢出应用表示满层后再次尝试施加GE时会拒绝施加
+- 在C++中还有一个bRequireModifierSuccessToTriggerCues的bool值，表示仅当Modifier成功修改时才触发Cue
+
 #### UGameplayEffectExecutionCalculation
 
 即上文中提到的"计算类"，其捕获Attribute，执行计算逻辑，最后返回处理后的值
@@ -258,27 +289,84 @@ $$
 > 
 > 关于C++原生继承的部分可以看[知乎的一个帖子](https://zhuanlan.zhihu.com/p/1963398821410236165)，因为比较复杂这里先不详细写了，之后有时间在复习的时候再写
 
-#### Gameplay Cues
+#### FGameplayEffectSpec
 
-抑制堆叠提示指的是：同一个GE堆叠时，是否抑制后面的GE触发Cue，如果勾选则只有第一层触发Cue而后续不触发；不勾选则每次都会触发
+UGameplayEffect是不可变资产，而FGameplayEffectSpec是运行时从UGameplayEffect实例化的运行时可变实例，程序在其上配置数据
 
-其中的GameplayCues数组的"幅度属性"指的是指定用来判断效果是否应用的数值，最低等级与最高等级限定了触发的条件范围。例如Attribute为造成伤害，等级0-10播放一种声音，10-20则播放另一种声音
+所有的内容写在一个指定的GameplayAbility类里
 
-配置什么效果播放则使用Gameplay提示标签配置，系统根据相应的标签寻找已注册的GameplayCue
+使用Spec分为以下几个步骤：
 
-#### 堆叠
+##### 1. 创建Spec
 
-堆叠样式指的是当该GE多次由同一目标触发或者对同一目标触发多次时的叠层方式。
+由该类的GA创建一个FGameplayEffectSpecHandle：
 
-- No Stacking：即不堆叠，产生两个相同的独立的GE，例如火球术攻击到同一目标时创建相同的GE
-- Stack Per Source：当该GE的来源多次释放相同GE时叠层，例如一个牧师重复释放三次光环时力量翻三倍
-- Stack Per Target：当该GE的拥有者多次被施加相同GE时叠层，例如三个法师都对敌人释放点燃则点燃叠三层
+```cpp
+// 简略版，该函数默认使用当前GA上下文
+FGameplayEffectSpecHandle MakeOutgoingGameplayEffectSpec(TSubclassOf<UGameplayEffect> GameplayEffectClass, float Level=1.f)
+// 完整版，需要手动传Handle、ActorInfo和ActivationInfo，（该函数为暴露给蓝图）
+UE_API virtual FGameplayEffectSpecHandle MakeOutgoingGameplayEffectSpec(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, TSubclassOf<UGameplayEffect> GameplayEffectClass, float Level = 1.f) const;
+``` 
 
-其中Stack Per Target和Stack Per Target模式下有几个可配置项：
+该函数创建一个FGameplayEffectSpecHandle，这是一个FGameplayEffectSpec的包装器，其包含了一个FGameplayEffectSpec的TSharedPtr指针`TSharedPtr<FGameplayEffectSpec> Data`，使用时在Data上操作
 
-- 堆栈限制计数：最大叠层，该值为0或-1时表示无上限
-- 堆栈持续时间刷新策略，其中有一个枚举项为"Extand Duration"，即将持续时间叠加
-- 堆栈周期重设策略，顾名思义
-- 堆栈计数系数为一bool值，为true时表示Modifier的计算结果自动乘以StackCount，为false时则不影响数值。例如中毒效果每秒10点伤害，如果堆栈计数系数为true，则3层中毒时每秒10*3=30点伤害
-- 溢出描述了满层后如何进行处理，可以选择触发额外的GE
-  - 拒绝溢出应用表示满层后再次尝试施加GE时会拒绝施加
+##### 2. 自定义或覆盖属性
+
+这一步是可选的，如果你在GE部分就已经填好了，这里再进行设置属性可以在运行时改变GE实际的效果，允许更加灵活的调整
+
+例如GE部分设置为"由调用者设置"的数值就在这里传入，例如下面这个函数
+
+```cpp
+Spec.Data->SetSetByCallerMagnitude(FGameplayTag::RequestGameplayTag("SetByCaller.Damage.Fireball"), 80.0f);
+```
+
+该函数尝试查找"SetByCaller.Damage.Fireball"这个Tag并匹配对应的SetByCall值（在UGameplayEffect类里已经为每个"由调用者设置"的变量分配了Tag）
+
+RequestGameplayTag函数表示，如果项目中已经注册了该Tag就返回它，未注册则根据项目设置返回无效Tag或自动注册
+
+其他可按需调用的方法：
+
+```cpp
+// 覆盖Duration
+Spec.Data->SetDuration(10.0f, false);
+// 设置层数
+Spec.Data->SetStackCount(3);
+// 动态添加一个Tag，之后源标签识别时能够识别到该标签（即用于SourceTag匹配），并且将这个标签注册到标签列表里（如果没有的话）
+Spec.Data->AddDynamicAssetTag(SomeTag);
+// 使GE触发后额外为该GE的应用目标对象添加该标签
+Spec.Data->DynamicGrantedTags.AddTag(SomeTag);
+// 将命中点记录在Context中（可用于Cue在命中位置播放效果）
+Spec.Data->GetContext().AddHitResult(MyHit);
+// 将效果的起点记录在Context中（可用于Cue在Origin位置播放效果）
+Spec.Data->GetContext().AddOrigin(ExplosionLocation);
+// Context记录效果的信息，例如释放者、释放技能、释放点等等，后续GE执行时ExecutionCalculation和GameplayCue从中读取数据
+```
+
+##### 3. 应用Spec
+
+Apply部分涉及到部分网络同步相关的内容，但那是实现细节里的内容了，一般应用只需在GA中调用Apply的函数即可
+
+```cpp
+ApplyGameplayEffectSpecToTarget(Spec, TargetASC);
+```
+#### FActiveGameplayEffect
+
+FActiveGameplayEffect是一个GE在正在发挥作用时的追踪，其为一结构体，我们一般不直接操作它，而是通过Handle操作
+
+Handle即FActiveGameplayEffectHandle，为上面的Apply操作的返回值，一般用于追踪GE的运行效果，或者提前移除GE
+
+我们可以通过Handle对ActiveGE做以下操作：
+
+```cpp
+// 提前移除
+TargetASC->RemoveActiveGameplayEffect(Handle);
+// 检查是否还在生效
+bool bIsActive = Handle.IsValid();
+// 查询该GE对某属性的当前贡献
+TargetASC->GetGameplayEffectMagnitude(Handle, Attr);
+```
+
+### Gameplay Cue
+
+GameplayCue用于进行非游戏逻辑相关的内容，例如音效、例子特效、震屏等
+
