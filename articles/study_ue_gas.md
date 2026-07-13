@@ -368,5 +368,65 @@ TargetASC->GetGameplayEffectMagnitude(Handle, Attr);
 
 ### Gameplay Cue
 
-GameplayCue用于进行非游戏逻辑相关的内容，例如音效、例子特效、震屏等
+GameplayCue用于进行非游戏逻辑相关的内容，例如音效、粒子特效、震屏等
 
+> GameplayCue这个名词实际上在引擎中指代的是一系列事件/信号，例如触发一次"受击音效"代表一个GameplayCue
+> 
+> 而我们的核心为GameplayCueNotify。他是一种资产，我们在其中配置触发Cue的Tag以及播放什么效果。
+>
+> 我们主要围绕GameplayCueNotify讲解
+
+首先先说如何在蓝图中使用，然后再说具体的C++细节
+
+#### 在蓝图中简单使用
+
+第一步：新增蓝图，父类选择GameplayCueNotify_Burst或GameplayCueNotify_Looping（常用的两个类，虽然还有很多类但是不介绍）
+
+第二步：在蓝图类默认参数中配置触发Cue的GameplayTag（在GameplayCue栏中）
+
+第三步：在GCNEffect栏中配置粒子和声音以及其他更多效果
+
+第四步：在GE中配置触发对应的Tag
+
+#### Burst与Looping
+
+在创建时你会注意到，GameplayCueNotify_Burst的父类为UGameplayCueNotify_Static，而GameplayCueNotify_Looping的父类为AGameplayCueNotify_Actor
+
+他们的最大区别为：Burst没有"持续时间"这个概念，其触发是瞬时的，而Looping会在添加时向世界生成一个Actor实例，并且可以手动添加与删除，拥有完整的生命周期
+
+不过Looping在大多数情况下不需要写Tick，为其配置的粒子和特效会循环，且类默认值中已经为效果预设好了生命周期中应该播放哪些内容，需要Tick的场景：
+
+```cpp
+void AGCN_Burning::Tick(float DeltaTime)
+{
+  // 跟随目标移动
+  SetActorLocation(Target->GetActorLocation());
+
+  // 根据游戏状态缩放效果
+  // 从Owner的ASC获取到HP值
+  float HPPersent = GetHPPersent();
+  // HP越低火焰越小
+  BurningParticle->SetFloatParam("Intensity", HPPersent);
+
+  // 自定义衰减逻辑
+  float Remaining = GetRemainingTime();
+  if (Remaining < 1.f) SetEffectAlpha(Remaining);
+}
+```
+
+Tick里只写和自己涉及的效果有关的逻辑，不要写游戏逻辑！
+
+#### GE之外的场景
+
+如果希望不通过GE而直接触发GameplayCue，可以调用ASC提供的方法：
+
+```cpp
+// 触发一次性Cue
+ASC->ExecuteGameplayCue(FGameplayTag::RequestGameplayTag("GameplayCue.Hit.Impact"));
+// 添加循环Cue
+ASC->AddGameplayCue(FGameplayTag::RequestGameplayTag("GameplayCue.Fire.Burning"));
+// 移除循环Cue
+ASC->RemoveGameplayCue(FGameplayTag::RequestGameplayTag("GameplayCue.Fire.Burning"));
+```
+
+还有GA中也可以直接触发GameplayCue，并且暴露给了蓝图,节点名与上面几乎一样，只是多了"On Owner"和"To Owner"
