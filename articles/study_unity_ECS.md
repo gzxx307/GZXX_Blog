@@ -13,6 +13,8 @@ Tags: Unity, 知识, 性能优化
 > [【游戏优化与设计模式】19 ECS框架详解](https://www.bilibili.com/video/BV1XTxuzfEB9/?spm_id_from=333.337.search-card.all.click&vd_source=0748f696e1bda1e6909280682b804700)
 >
 > [ECS可能正在毁掉你的游戏…](https://www.bilibili.com/video/BV1Kyut6JEvS?spm_id_from=333.788.videopod.sections&vd_source=0748f696e1bda1e6909280682b804700)
+>
+> [官方文档](https://docs.unity3d.com/Packages/com.unity.entities@6.5/manual/concepts-intro.html)
 
 ## ECS是什么？
 
@@ -47,7 +49,7 @@ ECS即**Entity-Component-System**，这是一种**面向数据（DOD）**的架�
 
 简单代码示例：
 
-```csharp
+```cpp
 // Entity，实际应用时应该是一个Index+Version的结构体
 using Entity = uint32_t;
 
@@ -76,6 +78,194 @@ void DamageSystem(world& world, span<const Hit> hits)
 // Player: Position Velocity Health Attack
 // Turret: Position Health Attack
 // Bullet: Position Velocity Damage
+```
+
+```cpp
+#include <iostream>
+#include <vector>
+#include <unordered_map>
+#include <memory>
+
+using namespace std;
+
+// 将Entity仅作为一个ID
+using Entity = size_t;
+
+// Components
+struct Position
+{
+    float x, y;
+};
+struct Velocity
+{
+    float dx, dy;
+};
+
+class World;
+class System;
+class MovementSystem;
+
+// 在ECS中，我们使用World统一管理所有实体和组件
+class World
+{
+private:
+    // 所有实体的数组
+    vector<Entity> Entities;
+    // 创建实体时我们需要递增id
+    Entity nextID = 0;
+    // 实体的Position
+    unordered_map<Entity, Position> Positions;
+    // 实体的Velocity
+    unordered_map<Entity, Velocity> Velocities;
+
+    // 更新时间
+    float deltaTime;
+
+    vector<unique_ptr<System>> Systems;
+
+public:
+    // 一些用于调试的打印函数
+    void printEntities()
+    {
+        // cout << "| Entity | Position | Velocities |" << endl;
+        // for (auto entity : Entities)
+        // {
+        //     cout << "| " << entity << " | " << Positions[entity].x << " " << Positions[entity].y << " | " << Velocities[entity].dx << " " << Velocities[entity].dy << " |" << endl;
+        // }
+
+        printPositions();
+        printVelocities();
+    }
+    void printPosition(Entity entity, Position position) const
+    {
+        std::cout << "Entity " << entity << " Position : (" << position.x << ", " << position.y << ")\n";
+    }
+    void printVelocity(Entity entity, Velocity velocity) const
+    {
+        std::cout << "Entity " << entity << " Velocity : (" << velocity.dx << ", " << velocity.dy << ")\n";
+    }
+    void printPositions() const
+    {
+        for(Entity e : Entities)
+        {
+            auto p = Positions.find(e);
+            if(p != Positions.end()) printPosition(e,p->second);
+            else cout << "Entity " << e << "has no position" << endl;
+        }
+    }
+    void printVelocities() const
+    {
+        for(Entity e : Entities)
+        {
+            auto p = Velocities.find(e);
+            if(p != Velocities.end()) printVelocity(e,p->second);
+            else cout << "Entity " << e << "has no velocity" << endl;
+        }
+    }
+
+    // 创建新实体时递增ID来获取唯一ID
+    // 这里可以换ID获取方式，可以提高ID利用率
+    Entity& newEntity()
+    {
+        Entity id = nextID++;
+        Entities.push_back(id);
+        return id;
+    }
+    vector<Entity> getEntities()
+    {
+        return Entities;
+    }
+    
+    // 对对应实体添加以及查找组件
+    void addPosition(Entity entity, Position position)
+    {
+        Positions[entity] = position;
+    }
+    Position& getPosition(Entity entity)
+    {
+        return Positions[entity];
+    }
+    void addVelocity(Entity entity, Velocity velocity)
+    {
+        Velocities[entity] = velocity;
+    }
+    Velocity& getVelocity(Entity entity)
+    {
+        return Velocities[entity];
+    }
+
+    // 为该World添加System
+    void addSystem(unique_ptr<System> system)
+    {
+        Systems.push_back(system);
+    }
+    // 获取到所有System
+    vector<unique_ptr<System>>& getSystems()
+    {
+        return Systems;
+    }
+
+    float getDeltaTime() const
+    {
+        return deltaTime;
+    }
+};
+
+class System
+{
+public:
+    virtual ~System() = default;
+    virtual void Update(World& world, float deltaTime) = 0;
+};
+
+class MovementSystem : public System
+{ 
+public:
+    // 移动系统处理的移动逻辑
+    void Update(World& world, float deltaTime) override
+    {
+        vector<Entity> entities = world.getEntities();
+        for(Entity entity : entities)
+        {
+            Position& position = world.getPosition(entity);
+            Velocity& velocity = world.getVelocity(entity);
+            position.x += velocity.dx * deltaTime;
+            position.y += velocity.dy * deltaTime;
+        }
+    }
+};
+
+int main()
+{
+    // 世界数组
+    // 这个世界和我们常理解的世界（Scene或者Level）不同
+    // 一个Scene中可以有多个World，用于分区管理
+    vector<World> Worlds;
+
+    World world1;
+    world1.addSystem(make_unique<MovementSystem>());
+    Worlds.emplace_back(world1);
+
+    Entity entity1 = world1.newEntity();
+    world1.addPosition(entity1, {0,0});
+    world1.addVelocity(entity1, {1,1});
+
+    bool running = true;
+    // 游戏主循环
+    while(running)
+    {
+        for(auto& world : Worlds)
+        {
+            for(auto& system : world.getSystems())
+            {
+                system->Update(world, world.getDeltaTime());
+            }
+        }
+        
+        // 给个示例
+        break;
+    }
+}
 ```
 
 ### 与面向对象思想的区别
@@ -118,6 +308,33 @@ CPU处理数据的实际速度并不只与CPU在理想状态下处理数据的�
 在具体的工程实现中，这部分一般由特定的一些库实现，例如Unity中的Burst，其能够将符合条件的C#代码编译成高度优化的原生机器码。
 
 ## 在Unity中应用ECS思想
+
+基于上述种种介绍，我们很容易发现：如果要自己从头开始设计一款基于ECS设计的框架，需要懂很多相当底层的设计，例如内存分配、编译原理等等。
+
+于是，Unity官方为了让程序员能够在引擎中方便地使用ECS并发挥其最大性能，在Unity中设计了自己的基于ECS的框架：DOTS。
+
+### DOTS
+
+DOTS全称为Data-Oriented Technology Stack（面向数据技术栈），其核心部分由三个相对独立的库组成：
+
+- Unity.Entities：包含ECS框架本体，提供Entity、组件接口`IComponentData`、System、World，以及优化Component内存分布的Archetype/Chunk内存管理机制等。
+- Unity.Jobs：引擎自带的多线程并行框架，Entities其之上把Entity遍历按chunk切分并行执行。
+- Unity.Burst：把符合条件的C#源码编译成高度优化的原生机器码，包含在Entities包中。
+
+其中Entities为UnityECS核心中的核心，而Burst和Jobs两个库实际上可以脱离ECS单独用在普通的MonoBehaviour上
+
+当你安装了Entities包后，还有两个基础依赖会随其自动安装：
+
+- Unity.Collections：NativeArray/NativeList/NativeHashMap等无GC的容器，其用于存放ECS内容
+- Unity.Mathematics：提供float3/float4x4等类型以及其他工具的数学库
+
+> [!note]
+>
+> 该部分及以下示例版本为6000.5.8f1
+
+
+
+### 使用DOTS的简单示例
 
 ## Unity中的ECS详解
 
