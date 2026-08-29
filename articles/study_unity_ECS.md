@@ -80,6 +80,12 @@ void DamageSystem(world& world, span<const Hit> hits)
 // Bullet: Position Velocity Damage
 ```
 
+除了三个核心概念之外，ECS还有许多重要的概念：
+
+- World
+
+自己用c++写的简单完整示例：
+
 ```cpp
 #include <iostream>
 #include <vector>
@@ -332,9 +338,129 @@ DOTS全称为Data-Oriented Technology Stack（面向数据技术栈），其核�
 >
 > 该部分及以下示例版本为6000.5.8f1
 
-
-
 ### 使用DOTS的简单示例
+
+#### Step1 创建数据Component
+
+在Unity里创建一个C#脚本（在Unity6中好像把"C# Script"改成了"Monobehaviour Script"，但实际上我们不用MonoBehaviour），命名为该Component的名称，把引擎创建C#脚本自动复制过来的副本删掉，然后编写你需要的数据结构：
+
+```csharp
+// ECS/DOTS的核心
+using Unity.Entities;
+// 使用“Mathematics”包来配合“Jobs”包功能加速计算
+using Unity.Mathematics;
+// 删掉不用的包
+// using UnityEngine;
+
+// 必须使用Struct
+public struct MoveSpeed : IComponentData
+{
+    // float3是Mathematic库提供的紧凑值类型，如果是类类型的话会有内存填充浪费部分内存
+    public float3 Speed;
+}
+```
+
+#### Step2 创建使用这些数据的MonoBehaviour类
+
+创建你希望使用这些Component数据的MonoBehaviour类，例如让一个Cube动起来。
+
+我们需要在Entity世界中创建对应的Entity，并在MonoBehaviour类中记录它，便于后续通过Entity查找对应的值获取并同步。
+
+```csharp
+// 与ECS相关
+using Unity.Entities;
+// 包含LocalTransform
+using Unity.Transforms;
+using UnityEngine;
+
+public class Cube : MonoBehaviour
+{
+    // 该GameObject的实体ID
+    private Entity _entity;
+    // 用来添加、删除等管理Entity的Manager
+    private EntityManager _entityManager;
+
+    private void Awake()
+    {
+        #region 初始化该对象的entity标签
+
+        // 初始化Manager
+        // DefaultGameObjectInjectionWorld是Unity启动时默认创建的默认World
+        // 该World用于桥接（Injection）Entity的World和GameObject，所以GameObject才能从中拿到数据
+        // 并且，该World会自动注册所有ISystem，不需要手动注册
+        _entityManager = World.DefaultGameObjectInjectionWorld.EntityManager;
+        _entity = _entityManager.CreateEntity();
+
+        #endregion
+
+        #region 挂Components
+        
+        // 给_entity（也就是自身）挂上MoveSpeed，初始值为0
+        _entityManager.AddComponentData<MoveSpeed>(_entity, new MoveSpeed { Speed = Vector3.zero });
+        // 给_entity挂上LocalTransform，初始值为物体初始位置
+        _entityManager.AddComponentData<LocalTransform>(_entity, LocalTransform.FromPosition(transform.position));
+        
+        // 如果使用AddComponent函数，那么则少传一个初始值的参数，此时会对值进行默认初始化，例如float3 = (0,0,0)
+        
+        #endregion
+        
+        }
+
+    private void Update()
+    {
+        // 从Entity世界中获取数据
+        LocalTransform localTransform = _entityManager.GetComponentData<LocalTransform>(_entity);
+        // 同步到MonoBehaviour的transform
+        transform.position = localTransform.Position;
+    }
+    
+}
+```
+
+#### Step3 创建系统System
+
+System用于更新Entity世界的数据，需要实现ISystem接口并推荐使用partial关键字。
+
+关键函数为OnUpdate，每帧执行。一般在该函数中我们会用到SystemAPI去获取到该System所在的世界的内容，例如下面所写的获取到所有包含LocalTransform和MoveSpeed两个Component的Entity。
+
+另外，还可以使用[BurstCompile]，把符合约束的C#函数编译成原生机器码。至于约束是什么后面再讲。
+
+```csharp
+using Unity.Burst;
+using Unity.Entities;
+using Unity.Transforms;
+
+// partial关键字允许该类/结构体在多个文件中定义，编译时会将所有相同名称的结构体放在一起进行编译
+partial struct MovementSystem : ISystem
+{
+    // 实现ISystem接口的函数
+    [BurstCompile]
+    public void OnUpdate(ref SystemState state)
+    {
+        // 遍历每一个同时具有LocalTransform和MoveSpeed两个Component的entity
+        // 其中Query代表查找所有同时拥有后面两个component构成的元组的entity，返回的是一个元组
+        // RW代表读写，RO则代表只读，两者获取的都是数据的引用，只不过RO是只读引用
+        foreach (var entity in SystemAPI.Query<RefRW<LocalTransform>, RefRO<MoveSpeed>>())
+        {
+            // 获取到的entity有多个Item，这里通过提取Item1并指定其为读写来更新transform
+            LocalTransform localTransform = entity.Item1.ValueRW;
+            // MoveSpeed则是只读的
+            MoveSpeed moveSpeed = entity.Item2.ValueRO; // 这时产生副本
+            // 累加速度并写回entity
+            entity.Item1.ValueRW.Position = localTransform.Position + moveSpeed.Speed * SystemAPI.Time.DeltaTime;
+        }
+        
+        // 也可以这么写（可读性更好）
+        /*
+        foreach (var (transform, speed) in SystemAPI.Query<RefRW<LocalTransform>, RefRO<MoveSpeed>>())
+        {
+            transform.ValueRW.Position += speed.ValueRO.Speed * SystemAPI.Time.DeltaTime;
+        }
+        */
+    }
+}
+```
+
 
 ## Unity中的ECS详解
 
