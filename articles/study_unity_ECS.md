@@ -417,6 +417,8 @@ public class Cube : MonoBehaviour
 }
 ```
 
+写好后，将其挂到你希望其移动的GameObject上。
+
 #### Step3 创建系统System
 
 System用于更新Entity世界的数据，需要实现ISystem接口并推荐使用partial关键字。
@@ -461,8 +463,184 @@ partial struct MovementSystem : ISystem
 }
 ```
 
+以上的都写好并放好后，可以先试试看能不能跑起来。将初始化MoveSpeed的AddComponentData的初始值改成其他值即可
+
+也就是下面这一行
+
+```csharp
+_entityManager.AddComponentData<MoveSpeed>(_entity, new MoveSpeed { Speed = Vector3.zero });
+```
+
+改成
+
+```csharp
+_entityManager.AddComponentData<MoveSpeed>(_entity, new MoveSpeed { Speed = Vector3.one });
+```
+
+#### Step4 让方块根据输入移动
+
+输入移动的逻辑可以写在Cube类里，也可以通过另外一个System进行控制
+
+如果写在Cube类里，可以在Update中获取到输入的值，经过处理后使用SetComponentData更新至Entity世界：
+
+```csharp
+_entityManager.SetComponentData<MoveSpeed>(inputSpeed);
+```
+
+写作一个单独的System的话，你可以通过ValueRW直接修改值，并保留处理过程，例如添加新Component名为InputSpeed，并创建输入用的System中修改InputSpeed，再创建一个System用于在InputSpeed与MoveSpeed之间对数据进行处理。
+
+不保留中间处理的System：
+
+```csharp
+using Unity.Entities;
+using Unity.Mathematics;
+using UnityEngine.InputSystem;
+
+partial struct KeyboardInputSystem : ISystem
+{
+    // 这里不能加[BurstCompile]，因为Keyboard.current是托管API，Burst无法编译
+    public void OnUpdate(ref SystemState state)
+    {
+        foreach (var entity in SystemAPI.Query<RefRW<MoveSpeed>>())
+        {
+            // 用于多个输入累加
+            float3 inputSpeed = 0;
+            // Unity推出的新输入API
+            if (Keyboard.current.wKey.isPressed) inputSpeed += new float3(1f, 0f, 0f);
+            if (Keyboard.current.sKey.isPressed) inputSpeed += new float3(-1f, 0f, 0f);
+            if (Keyboard.current.aKey.isPressed) inputSpeed += new float3(0f, 0f, 1f);
+            if (Keyboard.current.dKey.isPressed) inputSpeed += new float3(0f, 0f, -1f);
+            
+            // normalize在值为0时仍然会尝试除以模长0导致产生NaN，normalizesafe则在长度约等于0时返回零向量
+            // 由于System每帧都会无条件的跑（除非手动加条件分支），更推荐用normalizesafe，最好养成习惯
+            inputSpeed = math.normalizesafe(inputSpeed);
+            entity.ValueRW.Speed = inputSpeed;
+        }
+    }
+}
+```
+
+另外，后面会生成一堆Cube，该系统会获取到所有带MoveSpeed这个Component的entity，导致你的输入会影响到所有对象。如果你希望让每个Cube随机移动而只有特定的Cube受你的操控，可以创建一个没有数据的Component：
+
+```csharp
+public struct PlayerTag : IComponentData {}
+```
+
+该Component作为纯标签，可以通过在获取entity的Query中添加该标签作为约束，以获取所有拥有PlayerTag的entity，这样就可以限制输入的影响范围了。
+
+除此之外，你还可以使用链式的方式来约束，例如：
+
+```csharp
+using Unity.Burst;
+using Unity.Entities;
+// Unity的Mathematics库的Random是一个结构体，适配Burst的编译要求
+// using Random = Unity.Mathematics.Random;
+
+partial struct InputToMovementSystem : ISystem
+{
+    private Random _random;
+
+    public void OnCreate()
+    {
+        // 初始化随机数生成器
+        _random = new Random((uint)System.DateTime.Now.Millisecond);
+    }
+    
+    [BurstCompile]
+    public void OnUpdate(ref SystemState state)
+    {
+        // 与PlayerTag有关
+        foreach (var (moveSpeed, inputSpeed, playerTag) in SystemAPI.Query<RefRW<MoveSpeed>, RefRO<InputSpeed>, RefRO<PlayerTag>>())
+        {
+            // 将InputSpeed的值同步到MoveSpeed
+            moveSpeed.ValueRW.Speed = inputSpeed.ValueRO.Value;
+        }
+        // 我们在Spawner创建实体的时候为实体随机初始化速度，这里的随机MoveSpeed就不用了
+
+        // WithNone<>()排除掉目标类型的实体
+        // foreach (var (moveSpeed, inputSpeed) in SystemAPI.Query<RefRW<MoveSpeed>, RefRO<InputSpeed>>().WithNone<PlayerTag>())
+        // {
+        //     // 随机的MoveSpeed
+        //     moveSpeed.ValueRW.Speed = _random.NextFloat3();
+        // }
+    }
+}
+```
+
+#### Step5 创建并渲染大量对象
+
+创建与渲染涉及两个核心概念：ArcheType与Entities Graphics库，分别管的是内存方向与渲染方向。我们还需要把Entities Graphics库装上。
+
+下面我们编写CubeSpawner用于生成大量对象，为后续性能对比做准备。
+
+```csharp
+using UnityEngine;
+using Unity.Entities;
+using Unity.Rendering;
+using Unity.Transforms;
+using UnityEngine.Rendering;
+using Random = Unity.Mathematics.Random;
+
+public class CubeSpawner : MonoBehaviour
+{
+    [SerializeField] private int spawnCount = 10000;
+    // Prefab创建是OOP思维
+    // ECS有自己的批量创建实体的方法，不需要使用GameObject
+    // [SerializeField] private Cube prefCube;
+
+    private EntityManager _entityManager;
+    // 组件集，用于Create带有多个组件的entity
+    private EntityArchetype _entityArchetype;
+
+    // 随机数生成
+    private Random _random;
+    
+    // 用于渲染对象的部分
+    // 每个物体都需要一个Mesh和Material，并存储至RenderMeshArray中
+    // 还需要一个RenderMeshDescription决定各类渲染选项
+    [SerializeField] private Mesh mesh;
+    [SerializeField] private Material material;
+    private RenderMeshArray _meshArray;
+    private RenderMeshDescription _meshDescription;
+
+    
+    void Awake()
+    {
+        // 从默认World拿到Manager初始化
+        _entityManager = World.DefaultGameObjectInjectionWorld.EntityManager;
+        // 定义组件集合
+        _entityArchetype = _entityManager.CreateArchetype(typeof(LocalTransform), typeof(MoveSpeed));
+        // 初始化随机数生成器
+        _random = new Random((uint)System.DateTime.Now.Ticks);
+        // 初始化渲染组件
+        _meshArray = new RenderMeshArray(new Material[] { material }, new Mesh[] { mesh });
+        _meshDescription = new RenderMeshDescription(ShadowCastingMode.Off);
+    }
+
+    void Start()
+    {
+        MoveSpeed speed = new MoveSpeed();
+        for (int i = 0; i < spawnCount; i++)
+        {
+            // 创建
+            Entity entity = _entityManager.CreateEntity(_entityArchetype);
+            // 设置初始值
+            _entityManager.SetComponentData<LocalTransform>(entity, LocalTransform.FromPosition(_random.NextFloat3(-50f,50f)));
+            speed.Speed = _random.NextFloat3(-1f, 1f);
+            _entityManager.SetComponentData<MoveSpeed>(entity, speed);
+            // 挂渲染组件
+            // 第五个参数MaterialMeshInfo.FromRenderMeshArrayIndices(0,0)是为了显式指定使用的Mesh和Material的下标，因为源码的原因不用会报错
+            RenderMeshUtility.AddComponents(entity, _entityManager, _meshDescription, _meshArray, MaterialMeshInfo.FromRenderMeshArrayIndices(0,0));
+        }
+    }
+}
+```
+
+接下来，将CubeSpawner挂在一个场景里的空对象上，把Mesh和创建好的Material挂上去，应该就能看到场景中的物体了。
 
 ## Unity中的ECS详解
+
+
 
 ## 工厂类游戏的具体思想
 
