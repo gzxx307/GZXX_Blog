@@ -638,7 +638,70 @@ public class CubeSpawner : MonoBehaviour
 
 接下来，将CubeSpawner挂在一个场景里的空对象上，把Mesh和创建好的Material挂上去，应该就能看到场景中的物体了。
 
+#### Step6 将逻辑搬入Job
+
+我们先从单线程IJobEntity入手
+
+IJobEntity也是一个partial struct，其核心函数为一个Execute，其形参可以理解为告诉函数如何访问Component，并在这里面写入我们的逻辑。
+
+```csharp
+using Unity.Burst;
+using Unity.Entities;
+using Unity.Transforms;
+
+[BurstCompile]
+partial struct MovementJob : IJobEntity
+{
+    // 创建的时候往内部传入一个DeltaTime，这样就不用Time.DeltaTime了
+    // 因为Time是类类型，BurstCompile会判断其不符合条件
+    public float DeltaTime;
+    // ref和in分别代表引用和只读引用
+    void Execute(ref LocalTransform localTransform, in MoveSpeed moveSpeed)
+    {
+        localTransform.Position += moveSpeed.Speed * DeltaTime;
+    }
+}
+```
+
+在Job中写入逻辑后，我们就可以让System来调度这个Job
+
+```csharp
+using Unity.Burst;
+using Unity.Entities;
+using Unity.Jobs;
+using Unity.Transforms;
+
+partial struct MovementSystem : ISystem
+{
+    [BurstCompile]
+    public void OnUpdate(ref SystemState state)
+    {
+        // 创建MovementJob并将其加入执行队列
+        // ScheduleParallel为并行执行，利用多线程加快运算，非并行则是Schedule
+        state.Dependency = new MovementJob{DeltaTime = SystemAPI.Time.DeltaTime}.ScheduleParallel(state.Dependency);
+    }
+}
+```
+
+运行时打开任务管理器，可以看到cpu的多个核均开始工作，且Unity停止运行的时候cpu性能被释放，说明并行功能发力了。
+
 ## Unity中的ECS详解
+
+## 与DOTS相关的其他内容
+
+### 1. 系统排序与分组
+
+前面的代码一直存在一个潜在的问题，由于我们的System之间存在一个依赖链，但System的执行顺序是不固定的，因此如果MovementSystem先运行，而后KeyboardInputSystem后运行的话，MovementSystem就只能用上一帧的运行结果进行计算，这被称作“隐式依赖”
+
+官方提供了三个Attribute让开发者能够解决这一问题：
+
+- [UpdateInGroup(typeof(SimulationSystemGroup))]：指定系统属于哪一组（一般不用写，默认在SimulationSystemGroup组），组与组之间也可以设定更新顺序。
+- [UpdateAfter(typeof(X))]：在X之后更新。
+- [UpdateBefore(typeof(Y))]：在Y之前更新。
+
+这样可以将系统的执行顺序显式指定。
+
+你可以在运行时在导航栏的Window/Entities/Systems中查看实时的显式System运行顺序
 
 
 
