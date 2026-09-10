@@ -687,6 +687,107 @@ partial struct MovementSystem : ISystem
 
 ## Unity中的ECS详解
 
+### World
+
+我们先介绍World，是因为其他DOTS相关的内容都是在World之下的，Monobehaviour需要通过World才能获取到Entities的数据。换句话说，World是Monobehaviour进入Entities的第一步。
+
+World这个名字听起来很像Unity里的Scene和UE里的Level，但实际上它们是完全不同的东西。
+
+World是实体（Entities）、组件数据（Component Data）、系统（System）的封装，每个实体、组件以及系统都附着于某一个World。
+
+我说“某一个World”，意思就是能够存在多个World，每个World之间互相隔离，他们都有自己的实体。我们通过Query查询时只能查询到创建这个查询的World里的实体，EntityManager也只能处理本World的实体。
+
+我们上面使用的都是DefaultGameObjectInjectionWorld，其本质上是一个指向World的指针。在一次运行的生命周期中，引擎会自动创建一个世界，并挂满所有该世界的System以及对应的各种配置，并让这个指针指向该World。
+
+事实上，这个默认World并不是固定不变的，我们当然能通过直接赋值的方式让其指向我们手动创建的World，但前提是该World拥有完整的系统树，否则渲染相关的功能会出问题，这里不做深究。
+
+所以，我们一般不推荐更换默认World，只是创建一个什么都没有的World存东西。
+
+#### 创建
+
+```csharp
+public World(string name, WorldFlags flags = WorldFlags.Simulation)
+public World(string name, WorldFlags flags, AllocatorManager.AllocatorHandle backingAllocatorHandle)
+```
+
+WorldFlag指的是该World的分类，下面是WorldFlags枚举的所有值：
+
+```csharp
+[Flags]
+public enum WorldFlags : int
+{
+    None          = 0,
+    Live          = 1,                 // 游戏/应用的主世界
+    Editor        = (1 << 1) | Live,   // 编辑器里跑的主世界
+    Game          = (1 << 2) | Live,   // Player里跑的主世界
+    Simulation    = (1 << 3) | Live,   // 额外的后台模拟世界（物理/AI/网络等）
+    Conversion    = 1 << 4,            // 烘焙转换用的世界
+    Staging       = 1 << 5,            // 转换中间暂存
+    Shadow        = 1 << 6,            // 某世界的"上一个状态"快照
+    Streaming     = 1 << 7,            // 流式加载专用世界
+    GameServer    = (1 << 8) | Live,   // 服务器世界
+    GameClient    = (1 << 9) | Live,   // 客户端世界
+    GameThinClient= (1 << 10) | Live,  // 瘦客户端世界
+}
+```
+
+AllocatorHandle指的是指定内存分配器，高级用法一般不用。
+
+#### 静态成员
+
+```csharp
+// 全局约定入口
+public static World DefaultGameObjectInjectionWorld { get; set; }
+// 全部World的只读列表
+public static NoAllocReadOnlyCollection<World> All { get; }
+// 下一个世界的序号
+public static ulong NextSequenceNumber
+```
+
+#### 常用的属性
+
+- EntityManager：用来操作该World的接口
+- Flags：这个世界的WorldFlags
+- Name：World名
+- IsCreated：是否还没被销毁
+- Unmanaged：Burst相关
+- Time：即SystemAPI.Time的源头
+- MaximumDeltaTime：每帧deltaTime的上限，可读写
+- Systems：本世界的所有托管系统的列表
+
+#### 生命周期相关
+
+```csharp
+// 销毁当前World
+public void Dispose();
+// 销毁全部World
+public static void DisposeAllWorlds();
+// 值为True时停止Update
+public bool QuitUpdate { get; set; }
+```
+
+需要注意的是，World为非托管内存，也就是说它不会自动GC，需要我们在使用完后手动Dispose。
+
+#### 使用例
+
+```csharp
+// 创建一个新世界
+var simWorld = new World("BackupSim", WorldFlags.Simulation);
+var em = simWorld.EntityManager;
+
+// 在副世界建一个实体
+var e = em.CreateEntity();
+em.AddComponentData<MoveSpeed>(e, new MoveSpeed { Value = 1f });
+// 注意销毁
+simWorld.Dispose();
+```
+
+### EntityManager
+
+你或许也注意到了，我们在上面的示例中经常会用到EntityManager。事实上，EntityManager几乎就是我们在Entity世界中操作的唯一工具，以致于它值得被单开一章。
+
+
+
 ## 与DOTS相关的其他内容
 
 ### 1. 系统排序与分组
