@@ -697,9 +697,9 @@ World是实体（Entities）、组件数据（Component Data）、系统（Syste
 
 我说“某一个World”，意思就是能够存在多个World，每个World之间互相隔离，他们都有自己的实体。我们通过Query查询时只能查询到创建这个查询的World里的实体，EntityManager也只能处理本World的实体。
 
-我们上面使用的都是DefaultGameObjectInjectionWorld，其本质上是一个指向World的指针。在一次运行的生命周期中，引擎会自动创建一个世界，并挂满所有该世界的System以及对应的各种配置，并让这个指针指向该World。
+我们上面使用的都是DefaultGameObjectInjectionWorld，其本质上是一个静态的、指向某个World的公共入口。在一次运行的生命周期中，引擎会自动创建一个世界，并挂满所有该世界的System以及对应的各种配置，并让这个指针指向该World。
 
-事实上，这个默认World并不是固定不变的，我们当然能通过直接赋值的方式让其指向我们手动创建的World，但前提是该World拥有完整的系统树，否则渲染相关的功能会出问题，这里不做深究。
+事实上，这个默认World并不是固定不变的，我们当然能通过直接赋值的方式让其指向我们手动创建的World，但手动换World非常麻烦，而且可能会出各种问题，这里不做深究。
 
 所以，我们一般不推荐更换默认World，只是创建一个什么都没有的World存东西。
 
@@ -766,7 +766,18 @@ public static void DisposeAllWorlds();
 public bool QuitUpdate { get; set; }
 ```
 
-需要注意的是，World为非托管内存，也就是说它不会自动GC，需要我们在使用完后手动Dispose。
+需要注意的是，World持有非托管内存，这部分内存不会自动GC，需要我们在使用完后手动Dispose。
+
+#### 在World之间转移实体
+
+```csharp
+// 有多个重载，这里只写最简单的，主要记住函数名
+// 移动
+void MoveEntitiesFrom(EntityManager srcEntities);
+// 复制
+void CopyEntitiesFrom(EntityManager srcEntityManager);
+void CopyAndReplaceEntitiesFrom(EntityManager srcEntityManager);
+```
 
 #### 使用例
 
@@ -778,13 +789,288 @@ var em = simWorld.EntityManager;
 // 在副世界建一个实体
 var e = em.CreateEntity();
 em.AddComponentData<MoveSpeed>(e, new MoveSpeed { Value = 1f });
+
+// 将主世界的实体移过来
+simWorld.MoveEntitiesFrom(World.DefaultGameObjectInjectionWorld.EntityManager)
+
 // 注意销毁
 simWorld.Dispose();
 ```
 
+当然，这只是个最简单的World，其不包含获取System以及其他更复杂的内容，所以其只是一个空壳，只能被当作容器使用。实际上，我们只使用默认世界就足够了。
+
+具体如何使用自定义世界，参考官方文档。
+
+#### 获取World的两种情况
+
+在Monobehaviour中：
+
+```csharp
+var world = World.DefaultGameObjectInjectionWorld;
+```
+
+在System中：
+
+```csharp
+var world = state.WorldUnmanaged;
+```
+
 ### EntityManager
 
-你或许也注意到了，我们在上面的示例中经常会用到EntityManager。事实上，EntityManager几乎就是我们在Entity世界中操作的唯一工具，以致于它值得被单开一章。
+你或许也注意到了，我们在上面的示例中经常会用到EntityManager。事实上，EntityManager几乎就是我们在Entity世界之外操作Entity的唯一工具，以致于它值得被单开一章。
+
+#### 一些性质
+
+EntityManager是struct，所以`var em = world.EntityManager;`是值复制，但复制后仍然指向同一个世界的数据，因为其内部为指向数据的指针。
+
+EntityManager实现了`IEquatable<EntityManager>`，这意味着你可以使用`==`/`!=`对不同EntityManager做比较，比较内容为“是否指向同一世界的数据”
+
+EntityManager也有反向引用，可以通过em.World获取自己所属的世界。
+
+##### Sync Point 同步点
+
+当我们使用EntityManager进行操作，例如我们为实体加/删组件、创建/销毁实体、修改archetype等等操作时，由于ecs的实体存在内存的一个chunk中，而操作会导致实体结构变更，此时实体在内存中会产生布局变化，所有内存需要被迁移到一个新的chunk中重新布局，内存地址就会完全变化。
+
+此时，如果仍然让正在跑的Job持续运行，会导致无法预知的问题。所以，在上述结构变更前，必须等待所有Job结束，这就是sync point。
+
+为了保证运行安全性以及数据准确性，sync point会阻塞主线程，并且提前取消Job的并行机制。
+
+这是无法完全避免的，在本文之前的简单示例中，一次性生成10000个实体时会产生卡顿，原因就在这里。
+
+如何解决这种问题？后面讲。
+
+#### 操作的分类
+
+EntityManager的操作大致分两类：结构性操作与数据性操作。顾名思义，结构性操作会导致结构变更，也就是会产生上面的sync point，而数据性操作只对数据进行读写，并不会产生卡顿。
+
+源码中用了[StructuralChangeMethod]来标注结构性操作的方法，典型的例如`AddComponentData`，数据性操作的方法典型的有`GetComponent<T>`
+
+#### 常用的API
+
+部分常用的API，其中只写函数名、返回值以及其用途，以及最典型常用的重载，其他的各种重载在写代码的时候可以自己看看源码或者IDE给出的列表
+
+##### 实体生命周期
+
+```csharp
+// 空实体
+Entity CreateEntity();
+// 根据模板创建实体
+Entity CreateEntity(EntityArchetype archetype);
+// 指定有哪些组件
+Entity CreateEntity(params ComponentType[] types);
+// 批量且预分配数组
+void CreateEntity(EntityArchetype, NativeArray<Entity>);
+// 批量
+void CreateEntity(EntityArchetype archetype, int entityCount);
+// 克隆已有实体
+Entity Instantiate(Entity srcEntity);
+// 删除实体
+void DestroyEntity(Entity) / (NativeArray<Entity>) / (EntityQuery);
+// 清空世界
+void DestroyAndResetAllEntities();
+// 判断实体是否还存在（含版本检查）
+bool Exists(Entity entity);
+```
+
+##### 组件读写（数据性操作）
+
+```csharp
+// 读取实体某个组件的数据
+T GetComponentData<T>(Entity entity)
+// 写入实体某个组件的数据，组件必须已经存在，否则报错
+void SetComponentData<T>(Entity entity, T componentData)
+// 判断实体身上有没有这个组件
+bool HasComponent<T>(Entity entity)
+// 用ComponentType形式判断，类型只有在运行时才能确定时用这个重载
+bool HasComponent(Entity entity, ComponentType type)
+// 读取实体的动态缓冲区，也就是数组型组件
+DynamicBuffer<T> GetBuffer<T>(Entity entity, bool isReadOnly = false)
+// 判断实体身上有没有这个缓冲区
+bool HasBuffer<T>(Entity entity)
+// 添加托管组件，也就是用class实现的IComponentData
+void AddComponentObject(Entity entity, object componentData)
+// 读取托管组件
+T GetComponentObject<T>(Entity entity)
+// 读取挂在某个系统上的组件数据，其实系统本身在世界里也是一个实体
+T GetComponentData<T>(SystemHandle system)
+// 给挂在某个系统上的组件写数据
+void SetComponentData<T>(SystemHandle system, T componentData)
+// 拿到实体Transform的引用，可直接读写位置与旋转
+TransformRef GetTransformRef(Entity entity, bool isReadOnly = false)
+```
+
+##### 组件的增删（结构性操作）
+
+```csharp
+// 给实体添加一个空组件，像Tag这种零尺寸组件只能这样加
+bool AddComponent<T>(Entity entity)
+// 用ComponentType形式添加组件
+bool AddComponent(Entity entity, ComponentType componentType)
+// 添加组件并写入数据，已存在时返回false，但数据照样会被覆盖，内部就是AddComponent加SetComponentData两步
+bool AddComponentData<T>(Entity entity, T componentData)
+// 添加一个动态缓冲区
+DynamicBuffer<T> AddBuffer<T>(Entity entity)
+// 移除组件，返回是否真的移除了，实体不存在该组件时为false
+bool RemoveComponent<T>(Entity entity)
+// 用ComponentType形式移除组件
+bool RemoveComponent(Entity entity, ComponentType componentType)
+// 一次添加一组组件，把多个ComponentType打包成ComponentTypeSet，比逐个添加更快
+void AddComponents(Entity entity, in ComponentTypeSet componentTypeSet)
+// 一次移除一组组件
+void RemoveComponent(Entity entity, in ComponentTypeSet componentTypeSet)
+// 批量添加与移除，对一整批实体同时操作
+void AddComponent<T>(NativeArray<Entity> entities)
+void AddComponent(NativeArray<Entity> entities, ComponentType componentType)
+void RemoveComponent<T>(NativeArray<Entity> entities)
+void RemoveComponent(NativeArray<Entity> entities, ComponentType componentType)
+```
+
+##### 可启停组件
+
+```csharp
+// 设置实体的启用状态
+void SetEnabled(Entity entity, bool enabled)
+// 读取实体的启用状态
+bool IsEnabled(Entity entity)
+// 设置某个可启停组件的开关，组件不存在会报错
+void SetComponentEnabled<T>(Entity entity, bool value)
+// 读取某个可启停组件的开关
+bool IsComponentEnabled<T>(Entity entity)
+// 用ComponentType形式设置与读取
+void SetComponentEnabled(Entity entity, ComponentType componentType, bool value)
+bool IsComponentEnabled(Entity entity, ComponentType componentType)
+// 对一整个查询匹配到的所有实体批量启停
+void SetComponentEnabled<T>(EntityQuery query, bool value)
+void SetComponentEnabled(EntityQuery query, ComponentType componentType, bool value)
+```
+
+可启停组件（IEnableableComponent）的存在意义就是开关它不会引起结构变更，所以不会产生sync point，比“移除组件再重新加上”便宜得多。
+
+##### 共享组件
+
+```csharp
+// 设置共享组件，共享组件是按值分组的，值相同的实体会被放在同一个chunk里，所以修改它会让实体换chunk
+void SetSharedComponent<T>(Entity entity, T componentData)
+// 读取共享组件
+T GetSharedComponent<T>(Entity entity)
+// 添加共享组件，返回是否为新增，已存在时返回false
+bool AddSharedComponent<T>(Entity entity, T componentData)
+// 批量设置与添加
+void SetSharedComponent<T>(NativeArray<Entity> entities, T componentData)
+void AddSharedComponent<T>(NativeArray<Entity> entities, T componentData)
+// 按查询批量设置与添加
+void SetSharedComponent<T>(EntityQuery query, T componentData)
+void AddSharedComponent<T>(EntityQuery query, T componentData)
+// 枚举本世界用过的所有共享组件值，结果写进传入的List
+void GetAllUniqueSharedComponentData<T>(List<T> sharedComponentValues)
+// 查询实体身上该共享组件值的索引
+int GetSharedComponentIndex<T>(Entity entity)
+// 共享组件值的版本号，该值被修改时递增，可以用来判断“值变了才处理”
+int GetSharedComponentOrderVersion<T>(T sharedComponent)
+```
+
+除上面这些非托管版本外，还有一批Managed版本，例如SetSharedComponentManaged，用于旧式的、含托管引用的ISharedComponentData。
+
+##### Chunk组件
+
+```csharp
+// 给实体所在的整个chunk添加一个组件，该chunk里所有实体共用这一份数据
+bool AddChunkComponentData<T>(Entity entity)
+// 按查询批量添加chunk组件
+void AddChunkComponentData<T>(EntityQuery entityQuery, T componentData)
+// 读取实体所属chunk上的组件数据
+T GetChunkComponentData<T>(Entity entity)
+T GetChunkComponentData<T>(ArchetypeChunk chunk)
+// 写入chunk上的组件数据
+void SetChunkComponentData<T>(ArchetypeChunk chunk, T componentValue)
+// 移除chunk组件，实体身上没有该chunk组件时返回false
+bool RemoveChunkComponent<T>(Entity entity)
+void RemoveChunkComponentData<T>(EntityQuery entityQuery)
+```
+
+##### Archetype与查询
+
+```csharp
+// 创建一个Archetype，它是一组组件类型的组合，实体就是按Archetype分块存放的
+EntityArchetype CreateArchetype(params ComponentType[] types)
+// 把实体强行改成另一个Archetype，会引发结构变更
+void SetArchetype(Entity entity, EntityArchetype archetype)
+// 枚举本世界的所有Archetype，结果写进传入的NativeList
+void GetAllArchetypes(NativeList<EntityArchetype> allArchetypes)
+// 创建查询，按必需组件
+EntityQuery CreateEntityQuery(params ComponentType[] requiredComponents)
+// 创建查询，按EntityQueryDesc描述，可以写All/Any/None以及是否包含被禁用的实体
+EntityQuery CreateEntityQuery(params EntityQueryDesc[] queriesDesc)
+// 创建查询，按EntityQueryBuilder的链式写法
+EntityQuery CreateEntityQuery(in EntityQueryBuilder queriesDesc)
+// 一个匹配所有实体的查询
+EntityQuery UniversalQuery
+// 一个匹配所有实体且包含系统实体的查询，系统在世界里也是一个实体
+EntityQuery UniversalQueryWithSystems
+// 判断查询是否还合法，世界被销毁后查询会失效
+bool IsQueryValid(EntityQuery query)
+```
+
+##### 版本号与容量
+
+```csharp
+// 世界的实体顺序版本号，实体被创建或销毁时会递增，Version属性与之同义
+int EntityOrderVersion
+// 全局系统版本，每帧以及每次结构变更后递增，用来判断数据是否过期
+uint GlobalSystemVersion
+// 当前世界的实体容量，也就是已分配的实体槽位数
+int EntityCapacity
+// 某个组件类型的顺序版本，该类型的组件被增删时递增
+int GetComponentOrderVersion<T>()
+int GetComponentOrderVersion(ComponentType componentType)
+```
+
+##### 给Job用的句柄
+
+```csharp
+// 拿到组件与缓冲区的类型句柄，传给IJobChunk使用，参数表示是否只读
+ComponentTypeHandle<T> GetComponentTypeHandle<T>(bool isReadOnly)
+BufferTypeHandle<T> GetBufferTypeHandle<T>(bool isReadOnly)
+// 共享组件的类型句柄
+SharedComponentTypeHandle<T> GetSharedComponentTypeHandle<T>()
+// 实体自身的类型句柄
+EntityTypeHandle GetEntityTypeHandle()
+// 类型只有在运行时才能确定时用的动态句柄
+DynamicComponentTypeHandle GetDynamicComponentTypeHandle(ComponentType componentType)
+DynamicSharedComponentTypeHandle GetDynamicSharedComponentTypeHandle(ComponentType componentType)
+// 等待所有被追踪的Job完成，相当于手动制造一次sync point
+void CompleteAllTrackedJobs()
+void CompleteAllJobs()
+// 只等某一个组件的依赖完成，RW为读写依赖，RO为只读依赖
+void CompleteDependencyBeforeRW<T>()
+void CompleteDependencyBeforeRO<T>()
+```
+
+##### 实体信息与其他
+
+```csharp
+// 查询实体存放在哪个chunk的哪一格
+EntityStorageInfo GetStorageInfo(Entity entity)
+// 拿到实体所在的chunk
+ArchetypeChunk GetChunk(Entity entity)
+// 交换两个chunk中指定位置的实体数据，不改变结构
+void SwapComponents(ArchetypeChunk leftChunk, int leftIndex, ArchetypeChunk rightChunk, int rightIndex)
+// 拿到实体身上所有组件的类型，默认用Allocator.Temp分配
+NativeArray<ComponentType> GetComponentTypes(Entity entity, Allocator allocator = Allocator.Temp)
+// 实体身上有几个组件
+int GetComponentCount(Entity entity)
+// 找出所有实现了某个接口的组件类型，例如所有实现了IComponentData的类型
+List<Type> GetAssignableComponentTypes(Type interfaceType, List<Type> listOut)
+// 拿到本世界的所有chunk，调试与批量处理时用
+NativeArray<ArchetypeChunk> GetAllChunks(Allocator allocator = Allocator.TempJob)
+// 调试接口
+EntityManagerDebug Debug
+```
+
+托管组件的一批方法是以扩展方法形式提供的，都在EntityManagerManagedComponentExtensions这个静态类里，例如AddComponentData<T>(this EntityManager manager, Entity entity, T componentData)。
+
+
+
 
 
 
