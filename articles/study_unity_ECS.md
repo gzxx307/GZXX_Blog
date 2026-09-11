@@ -899,6 +899,20 @@ void SetComponentData<T>(SystemHandle system, T componentData)
 TransformRef GetTransformRef(Entity entity, bool isReadOnly = false)
 ```
 
+###### 非托管组件与托管组件
+
+一个组件是否为托管组件，仅看他是为struct还是class，当一个组件类型为class时为托管组件，使用的接口都是IComponentData。
+
+有几个场景需要在组件中用到class：
+
+- 引用UnityEngine对象，例如材质、GameObject等
+- 需要C#引用类型的数据结构，例如List<T>或者Dictionary<T1,T2>
+- 需要共享对象或缓存时
+
+这些对象都堆相关，他们不支持Job/Burst，所以被单独叫做托管组件。
+
+如果你只是希望引用一个Unity资源，Entities提供了非托管的`UnityObjectRef<T>`，用来替代托管引用。
+
 ##### 组件的增删（结构性操作）
 
 ```csharp
@@ -944,9 +958,21 @@ void SetComponentEnabled<T>(EntityQuery query, bool value)
 void SetComponentEnabled(EntityQuery query, ComponentType componentType, bool value)
 ```
 
-可启停组件（IEnableableComponent）的存在意义就是开关它不会引起结构变更，所以不会产生sync point，比“移除组件再重新加上”便宜得多。
+可启停组件（IEnableableComponent）的存在意义就是开关它不会引起结构变更，所以不会产生sync point。
+
+当一个组件被停止时，实际上组件还在实体上，也就是说，你仍然可以对该组件进行读写，只不过读到的是组件停止前的数值，写入时也不会被更改。
+
+其作用就是改变组件的可见性，主要作用在Query的时候。例如，一个实体现在拥有一个`MoveSpeed`与`InputSpeed`，其中`InputSpeed`被停止，此时如果我`SystemAPI.Query<RefRW<MoveSpeed>, RefRO<InputSpeed>>()`时，该实体并不会被匹配到，于此同时，`WithNone<InputSpeed>`就会匹配到。EntityQuery与IJobEntity的Execute同理。
+
+但需要注意的是，使用`SetEnabled(Entity, bool)`时启停的是实体，此时就会引发结构变更，也就会出现sync point。
 
 ##### 共享组件
+
+共享组件并不依附于某一实体，而是根据值来分组，值相同的实体被放在同一chunk，这样chunk就只需存储一个共享组件的索引即可
+
+当然，这样的存储方式会让共享组件值变更时需要更换chunk，会触发sync point。
+
+其带来的好处就是值相同的实体会被放在一起，遍历时的代价更低。也可以根据值来过滤遍历，只处理某一类实体。
 
 ```csharp
 // 设置共享组件，共享组件是按值分组的，值相同的实体会被放在同一个chunk里，所以修改它会让实体换chunk
@@ -969,9 +995,9 @@ int GetSharedComponentIndex<T>(Entity entity)
 int GetSharedComponentOrderVersion<T>(T sharedComponent)
 ```
 
-除上面这些非托管版本外，还有一批Managed版本，例如SetSharedComponentManaged，用于旧式的、含托管引用的ISharedComponentData。
-
 ##### Chunk组件
+
+chunk组件可以批量处理一个chunk的状态，例如一个工厂的一个区域的状态，其产能大小、是否停机等状态。
 
 ```csharp
 // 给实体所在的整个chunk添加一个组件，该chunk里所有实体共用这一份数据
@@ -1011,7 +1037,18 @@ EntityQuery UniversalQueryWithSystems
 bool IsQueryValid(EntityQuery query)
 ```
 
+EntityQuery和SystemAPI.Query的区别是，EntityQuery是一个查询到的对象的数组，你可以自己控制它，而SystemAPI.Query则只能用在系统中的foreach中，拿到的是逐个实体。
+
+EntityQuery用到的几个场景：
+
+- 需要取出数据交给其他算法
+- 需要在系统之外查询
+- 需要计数或判空
+- 需要控制系统是否运行
+
 ##### 版本号与容量
+
+版本号用来记录数据是否被更新的计数器，目的是跳过没有更新的数据
 
 ```csharp
 // 世界的实体顺序版本号，实体被创建或销毁时会递增，Version属性与之同义
@@ -1067,7 +1104,64 @@ NativeArray<ArchetypeChunk> GetAllChunks(Allocator allocator = Allocator.TempJob
 EntityManagerDebug Debug
 ```
 
-托管组件的一批方法是以扩展方法形式提供的，都在EntityManagerManagedComponentExtensions这个静态类里，例如AddComponentData<T>(this EntityManager manager, Entity entity, T componentData)。
+### Entity
+
+在Unity中Entity不仅仅是一个数字，而是多加了一个Version字段：
+
+```csharp
+public struct Entity : IEquatable<Entity>, IComparable<Entity>
+{
+    // 该实体的下标，实体销毁后会重复利用
+    public int Index;
+    // 记录当前实体为第几代，实体销毁时递增
+    public int Version;
+}
+```
+
+由于Index会被重复利用，当某一个Index的Entity被销毁后，可能会导致指向该实体的槽位转而指向另一个完全不同的实体，而该过程不存在任何反馈。所以引入Version。Version会逐渐递增，直到达到int大小的上线后回绕，但此时的量已经达到了21亿，完全足够了。
+
+官方提供了一系列API去对Entity做比较，所以不需要而且官方明确禁止自定义比较逻辑。
+
+- operator == / != / Equals(Entity)：Index和Version都相同才算同一实体
+- GetHashCode()：返回Index
+- CompareTo(Entity)：只按Index相减
+- Entity.Null：即为new Entity()
+- ToString()：返回"Entity(Index:Version)"，Null则是"Entity.Null"
+
+需要注意的是，在销毁Entity时，不会主动去回调用拥有该Entity的对象。所以，在销毁时，要么手动通知，要么使用EntityManager的Exists(Entity)函数检查可用性。
+
+#### EntityArchetype
+
+你可以将EntityArchetype看作一个实体的“模板”，我们通过EntityArchetype定义一个实体由哪些组件组成，并在生成这些实体时一次性给他挂上这些组件。
+
+关于如何创建与使用，详见[archetype与查询](#archetype与查询)
+
+EntityArchetype内部只有一个Archetype*，也就是说其为一个指针的包装，必须由EntityManager生产出来。
+
+常用成员：
+
+```csharp
+// 是否指向一个非空 archetype
+bool Valid;
+// 组件类型数量
+int TypesCount;
+// 这个archetype当前有几个 chunk
+int ChunkCount;
+// 每个chunk最多放几个实体
+int ChunkCapacity;
+// archetype级标志
+bool Prefab / bool Disabled;
+// 稳定哈希
+ulong StableHash;
+// 列出该archetype的所有组件
+NativeArray<ComponentType> GetComponentTypes(Allocator allocator = Allocator.Temp);
+// 算两个archetype的组件差异
+static void CalculateDifference(...)  
+```
+
+
+
+
 
 
 
